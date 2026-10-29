@@ -450,6 +450,141 @@ describe('OAuth and MAL transport', () => {
     expect(fetch.mock.calls[2][1].headers.Authorization).toBe('Bearer fresh');
   });
 });
+describe('finished series completion', () => {
+  const finished: Anime = {
+    ...anime,
+    status: 'finished_airing',
+    my_list_status: { ...anime.my_list_status!, num_episodes_watched: 12 },
+  };
+  const complete = { type: 'COMPLETE_ANIME', animeId: 1, expectedEpisodes: 12 };
+  const finale = (): PendingUpdate => ({
+    id: '5:1:12',
+    anime: finished,
+    episode: 12,
+    previous: 11,
+    tabId: 1,
+    createdAt: Date.now(),
+  });
+
+  it('completes and scores a fully watched finished-airing anime, refreshing every matching tab', async () => {
+    const previous = { ...session(), anime: finished, episode: 12 };
+    await mock.browser.storage.session.set({ 'tab:1': previous, 'tab:2': previous });
+    const status = { ...finished.my_list_status!, status: 'completed', score: 8 };
+    const fetch = vi.fn().mockResolvedValueOnce(json(finished)).mockResolvedValueOnce(json(status));
+    vi.stubGlobal('fetch', fetch);
+    expect((await message({ ...complete, score: 8 })).ok).toBe(true);
+    expect(fetch.mock.calls[1][1].method).toBe('PATCH');
+    expect(new URLSearchParams(fetch.mock.calls[1][1].body)).toEqual(
+      new URLSearchParams('status=completed&num_watched_episodes=12&score=8'),
+    );
+    expect(new URL(fetch.mock.calls[0][0]).searchParams.get('fields')?.split(',')).toContain(
+      'status',
+    );
+    for (const tab of [1, 2])
+      expect((mock.getSession()[`tab:${tab}`] as WatchSession).anime?.my_list_status).toEqual(
+        status,
+      );
+  });
+  it('logs a queued final episode and completes it in one approved update without changing an existing score', async () => {
+    await mock.browser.storage.local.set({ pending: [finale()] });
+    const fresh = {
+      ...finished,
+      my_list_status: { ...finished.my_list_status!, num_episodes_watched: 11 },
+    };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(json(fresh))
+      .mockResolvedValueOnce(json({ ...finished.my_list_status, status: 'completed' }));
+    vi.stubGlobal('fetch', fetch);
+    expect((await message({ ...complete, pendingId: '5:1:12' })).ok).toBe(true);
+    expect(fetch.mock.calls[1][1].body).toBe('status=completed&num_watched_episodes=12');
+    expect(mock.getLocal().pending).toEqual([]);
+  });
+  it('keeps ordinary final-episode approval limited to watched progress', async () => {
+    await mock.browser.storage.local.set({ pending: [finale()] });
+    const fresh = {
+      ...finished,
+      my_list_status: { ...finished.my_list_status!, num_episodes_watched: 11 },
+    };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(json(fresh))
+      .mockResolvedValueOnce(json(finished.my_list_status));
+    vi.stubGlobal('fetch', fetch);
+    expect((await message({ type: 'APPROVE_UPDATE', id: '5:1:12' })).ok).toBe(true);
+    expect(fetch.mock.calls[1][1].body).toBe('num_watched_episodes=12');
+  });
+  it.each<Partial<Anime>>([
+    { status: 'currently_airing' },
+    { status: 'not_yet_aired' },
+    { status: undefined },
+    { num_episodes: 0 },
+    { num_episodes: undefined },
+    { num_episodes: 13 },
+    { my_list_status: undefined },
+    { my_list_status: { ...anime.my_list_status!, num_episodes_watched: 11 } },
+    { my_list_status: { ...finished.my_list_status!, is_rewatching: true } },
+  ])('rechecks MAL and refuses completion for ineligible data: %j', async (overrides) => {
+    const fetch = vi.fn().mockResolvedValue(json({ ...finished, ...overrides }));
+    vi.stubGlobal('fetch', fetch);
+    expect((await message(complete)).ok).toBe(false);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it.each([-1, 11, 1.5, '8', null])(
+    'rejects an invalid score %s before contacting MAL',
+    async (score) => {
+      const fetch = vi.fn();
+      vi.stubGlobal('fetch', fetch);
+      expect((await message({ ...complete, score })).ok).toBe(false);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+  it('accepts score zero explicitly and never reduces an existing watched count', async () => {
+    const fresh = {
+      ...finished,
+      my_list_status: { ...finished.my_list_status!, num_episodes_watched: 13 },
+    };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(json(fresh))
+      .mockResolvedValueOnce(json({ ...fresh.my_list_status, status: 'completed', score: 0 }));
+    vi.stubGlobal('fetch', fetch);
+    expect((await message({ ...complete, score: 0 })).ok).toBe(true);
+    expect(fetch.mock.calls[1][1].body).toBe('status=completed&num_watched_episodes=13&score=0');
+  });
+  it('rejects foreign, missing and non-final pending updates', async () => {
+    await mock.browser.storage.local.set({
+      pending: [
+        { ...finale(), id: '6:1:12' },
+        { ...finale(), id: '5:1:11', episode: 11 },
+      ],
+    });
+    const fetch = vi.fn().mockResolvedValue(json(finished));
+    vi.stubGlobal('fetch', fetch);
+    for (const pendingId of ['6:1:12', 'missing', '5:1:11'])
+      expect((await message({ ...complete, pendingId })).ok).toBe(false);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('rejects completion requested by page scripts', async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    expect((await message(complete, content)).ok).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('leaves a finale queued if saving completion fails', async () => {
+    await mock.browser.storage.local.set({ pending: [finale()] });
+    const fresh = {
+      ...finished,
+      my_list_status: { ...finished.my_list_status!, num_episodes_watched: 11 },
+    };
+    const fetch = vi.fn().mockResolvedValueOnce(json(fresh)).mockResolvedValueOnce(json({}, 503));
+    vi.stubGlobal('fetch', fetch);
+    expect((await message({ ...complete, pendingId: '5:1:12', score: 8 })).ok).toBe(false);
+    expect(mock.getLocal().pending).toHaveLength(1);
+    expect(mock.getLocal().resolved).toBeUndefined();
+  });
+});
+
 describe('background consent boundary', () => {
   it('restores a checkpoint through detection after all tab sessions are lost', async () => {
     const previous = session();

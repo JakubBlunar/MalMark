@@ -6,6 +6,7 @@ import { WatchedCountControl } from './WatchedCountControl';
 import { AnimeInfo } from './AnimeInfo';
 import { WatchProgressBar } from './WatchProgress';
 import { AnimeListStatus } from './AnimeListStatus';
+import { CompleteAnimeControl } from './CompleteAnimeControl';
 
 export function NowPlayingCard({
   session: s,
@@ -54,6 +55,7 @@ export function NowPlayingCard({
       {anime?.my_list_status && !anime.my_list_status.is_rewatching && (
         <WatchedCountControl anime={anime} episode={s.episode} busy={busy} act={act} />
       )}
+      {anime && <CompleteAnimeControl key={anime.id} anime={anime} busy={busy} act={act} />}
       {s.episode && anime?.num_episodes && s.episode > anime.num_episodes ? (
         <div className="callout warning-text">
           Episode {s.episode} exceeds this MAL entry. Set an episode offset in Matches.

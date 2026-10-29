@@ -1,0 +1,47 @@
+.completion-control {
+  border-top: 1px solid var(--border);
+  padding: 16px 18px;
+  background: #19251f;
+}
+.completion-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+  color: var(--mint);
+  font-size: 11px;
+  font-weight: 550;
+}
+.completion-control p {
+  color: #a4b7ad;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.completion-control label {
+  margin: 14px 0 7px;
+}
+.completion-control select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #3b5046;
+  border-radius: 8px;
+  padding: 10px;
+  background: #121c17;
+  color: #eeeef4;
+  font: inherit;
+}
+.completion-control select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.completion-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+.pending-card > .completion-control {
+  margin: 18px -20px -20px;
+  border-color: #315045;
+}

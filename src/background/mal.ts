@@ -141,7 +141,7 @@ export async function request<T>(path: string, init: RequestInit = {}, retry = t
   }
 }
 
-const fields = 'alternative_titles,num_episodes,media_type,start_season,my_list_status';
+const fields = 'alternative_titles,num_episodes,status,media_type,start_season,my_list_status';
 
 export async function searchAnime(query: string): Promise<Anime[]> {
   const q = query.trim().slice(0, 100);
@@ -156,7 +156,7 @@ export async function getAnime(id: number): Promise<Anime> {
 
 export async function updateAnime(
   id: number,
-  values: { status?: string; num_watched_episodes?: number },
+  values: { status?: ListStatus['status']; num_watched_episodes?: number; score?: number },
 ): Promise<ListStatus> {
   const body = new URLSearchParams(Object.entries(values).map(([k, v]) => [k, String(v)]));
   return request(`/anime/${id}/my_list_status`, {

@@ -25,6 +25,9 @@ export function AnimeListStatus({
               {anime.my_list_status.num_episodes_watched} of {anime.num_episodes || '?'} episodes on
               MAL
             </span>
+            {anime.my_list_status.score ? (
+              <span>Your score: {anime.my_list_status.score}/10</span>
+            ) : null}
           </div>
           <a
             className="icon-button"

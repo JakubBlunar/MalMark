@@ -70,7 +70,11 @@ async function badge(tabId: number, session?: WatchSession): Promise<void> {
   ]).catch(() => undefined);
 }
 
-async function resolve(d: Detection, previous?: WatchSession): Promise<WatchSession> {
+async function resolve(
+  d: Detection,
+  previous?: WatchSession,
+  refreshMatch = false,
+): Promise<WatchSession> {
   const sameSeries = previous?.detection.seriesKey === d.seriesKey;
   const sameEpisode =
     sameSeries &&
@@ -102,7 +106,8 @@ async function resolve(d: Detection, previous?: WatchSession): Promise<WatchSess
             : null
           : positiveInteger(d.episode + mapping.episodeOffset);
     } else if (sameSeries && previous?.anime && previous.matchSource === 'automatic') {
-      session.anime = previous.anime;
+      session.anime =
+        previous.anime.status && !refreshMatch ? previous.anime : await getAnime(previous.anime.id);
       session.matchSource = 'automatic';
     } else {
       const title = titleForSeason(d.title, d.season);
@@ -329,7 +334,7 @@ async function recheck(tabId: number): Promise<void> {
   }
   const previous = await getSession(tabId);
   if (previous) {
-    const session = await resolve(previous.detection, previous);
+    const session = await resolve(previous.detection, previous, true);
     if (session.anime?.id !== previous.anime?.id || session.episode !== previous.episode)
       session.progress = emptyProgress();
     await setSession(tabId, session);
@@ -551,6 +556,65 @@ async function uiMessage(message: Message): Promise<unknown> {
       await refreshAnimeSessions(anime);
       for (const item of await getPending())
         if (item.anime.id === anime.id && item.episode <= message.episode)
+          await resolvePending(item);
+      return anime;
+    }
+    case 'COMPLETE_ANIME': {
+      if (
+        !positiveInteger(message.animeId) ||
+        !positiveInteger(message.expectedEpisodes) ||
+        (message.score !== undefined &&
+          (!Number.isInteger(message.score) || message.score < 0 || message.score > 10)) ||
+        (message.pendingId !== undefined && typeof message.pendingId !== 'string')
+      )
+        throw new Error('Choose a valid anime and a whole-number score from 0 to 10.');
+      const auth = await getAuth();
+      if (!auth) throw new Error('Connect your MyAnimeList account first.');
+      const pending =
+        message.pendingId === undefined
+          ? undefined
+          : (await getPending()).find(
+              (item) =>
+                item.id === message.pendingId &&
+                item.anime.id === message.animeId &&
+                item.id.startsWith(`${auth.profile?.id}:`),
+            );
+      if (message.pendingId !== undefined && !pending)
+        throw new Error('This final-episode update is no longer available for this account.');
+      const anime = await getAnime(message.animeId);
+      await refreshAnimeSessions(anime);
+      const queued = await getPending();
+      if (queued.some((item) => item.anime.id === anime.id))
+        await browser.storage.local.set({
+          pending: queued.map((item) => (item.anime.id === anime.id ? { ...item, anime } : item)),
+        });
+      if (anime.status !== 'finished_airing')
+        throw new Error('Only anime marked Finished Airing on MyAnimeList can be completed here.');
+      if (!anime.num_episodes || !positiveInteger(anime.num_episodes))
+        throw new Error(
+          'MyAnimeList must have a known total episode count before completing this anime.',
+        );
+      if (anime.num_episodes !== message.expectedEpisodes)
+        throw new Error(
+          'The total episode count changed on MyAnimeList. Review the refreshed anime and try again.',
+        );
+      if (!anime.my_list_status)
+        throw new Error('Add this anime to your list before completing it.');
+      if (anime.my_list_status.is_rewatching)
+        throw new Error('Rewatch progress needs to be updated on MyAnimeList.');
+      if (pending && pending.episode !== anime.num_episodes)
+        throw new Error('Only the final episode can be logged together with series completion.');
+      const watched = anime.my_list_status.num_episodes_watched;
+      if (watched < anime.num_episodes && !pending)
+        throw new Error('Log all episodes before marking this anime completed.');
+      anime.my_list_status = await updateAnime(anime.id, {
+        status: 'completed',
+        num_watched_episodes: Math.max(watched, anime.num_episodes),
+        ...(message.score === undefined ? {} : { score: message.score }),
+      });
+      await refreshAnimeSessions(anime);
+      for (const item of await getPending())
+        if (item.anime.id === anime.id && item.episode <= anime.my_list_status.num_episodes_watched)
           await resolvePending(item);
       return anime;
     }

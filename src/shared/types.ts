@@ -30,6 +30,7 @@ export interface Anime {
   main_picture?: { medium: string; large?: string };
   alternative_titles?: { en?: string; ja?: string; synonyms?: string[] };
   num_episodes?: number;
+  status?: 'finished_airing' | 'currently_airing' | 'not_yet_aired';
   media_type?: string;
   start_season?: { year: number; season: string };
   my_list_status?: ListStatus;
@@ -146,6 +147,13 @@ export type Message =
   | { type: 'REMOVE_MAPPING'; id: string }
   | { type: 'SET_EPISODE'; tabId: number; episode: number }
   | { type: 'SET_WATCHED'; animeId: number; episode: number; expectedPrevious: number }
+  | {
+      type: 'COMPLETE_ANIME';
+      animeId: number;
+      expectedEpisodes: number;
+      score?: number;
+      pendingId?: string;
+    }
   | { type: 'ADD_WATCHING'; tabId: number }
   | { type: 'APPROVE_UPDATE'; id: string }
   | { type: 'DISMISS_UPDATE'; id: string }

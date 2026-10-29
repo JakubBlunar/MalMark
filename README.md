@@ -7,6 +7,7 @@ A browser extension for Chrome, Brave and Firefox that detects the anime you’r
 - Playback tracking that accounts for speed changes and skipped scenes.
 - Partial episode progress survives browser restarts; old checkpoints expire after 30 days (100 episodes maximum).
 - Manual watched-count controls and reminders that survive autoplay.
+- Complete and optionally score finished-airing anime after the final episode.
 - A selector picker for websites you choose to add, with permission per domain.
 
 GitHub downloads start with API setup: create a MyAnimeList app of type **Other**, register the exact redirect URL shown by Malmark, and paste its public client ID. Then sign in, open an episode, and confirm updates when ready. Use **Open sidebar** in the header to keep Malmark beside your video. The sidebar follows the active tab.
@@ -32,7 +33,7 @@ npm run lint:firefox
 npm run package      # Browser ZIPs in artifacts/
 ```
 
-Previews support `?demo=watching`, `?demo=pending` and `?demo=unmatched`; extension actions are disabled there. Browser tests use isolated profiles and fixture data. Set `MALMARK_BROWSER_PATH` for Brave or `MALMARK_CHROME_PATH` for the optional installed-Chrome checks. Live streaming/account behavior still needs manual verification.
+Previews support `?demo=watching`, `?demo=pending`, `?demo=unmatched`, `?demo=finished` and `?demo=finale`; extension actions are disabled there. Browser tests use isolated profiles and fixture data. Set `MALMARK_BROWSER_PATH` for Brave or `MALMARK_CHROME_PATH` for the optional installed-Chrome checks. Live streaming/account behavior still needs manual verification.
 
 The UI is organized into `src/ui/views`, `components`, `hooks`, `services`, and `styles`. Other code lives in `src/content` (detection/player/picker), `src/background` (MAL, permissions, storage), and `src/shared`. `scripts/build.mjs` creates the browser-specific manifests and generates dependency notices from the bundled modules.
 

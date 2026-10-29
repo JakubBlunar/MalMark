@@ -2,6 +2,7 @@ import { ArrowRight, Check, CircleCheck } from 'lucide-react';
 import type { PendingUpdate } from '../../../shared/types';
 import type { Act } from '../../types';
 import { Spinner } from '../shared/Spinner';
+import { CompleteAnimeControl } from './CompleteAnimeControl';
 
 export function PendingUpdateCard({
   item,
@@ -60,6 +61,13 @@ export function PendingUpdateCard({
           Skip
         </button>
       </div>
+      <CompleteAnimeControl
+        key={item.anime.id}
+        anime={item.anime}
+        pending={item}
+        busy={busy}
+        act={act}
+      />
     </section>
   );
 }

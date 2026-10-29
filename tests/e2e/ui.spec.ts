@@ -72,6 +72,33 @@ test('pending updates remain explicit and preview cannot mutate data', async ({ 
   await expect(page.getByRole('status')).toContainText('Browser preview');
   await expect(page.getByRole('button', { name: 'Update progress', exact: true })).toBeVisible();
 });
+
+test('finished series offer optional scoring after all episodes are logged and in finale reminders', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 850 });
+  await page.goto('/sidebar.html?demo=watching');
+  await expect(page.getByRole('button', { name: 'Complete & rate' })).toHaveCount(0);
+  await page.goto('/sidebar.html?demo=finished');
+  await page.getByRole('button', { name: 'Complete & rate' }).click();
+  await expect(page.getByLabel('Your score')).toHaveValue('');
+  await expect(page.getByLabel('Your score').locator('option:checked')).toHaveText(
+    'Keep current score (8/10)',
+  );
+  await page.getByLabel('Your score').selectOption('9');
+  await page.getByRole('button', { name: 'Save completion' }).click();
+  await expect(page.getByRole('status')).toContainText('Browser preview');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: 'artifacts/screenshots/complete-series-sidebar.png',
+    fullPage: true,
+  });
+  await page.goto('/popup.html?demo=finale');
+  await expect(
+    page.locator('.pending-card').getByRole('button', { name: 'Complete & rate' }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Update progress', exact: true })).toBeVisible();
+});
 test('manual matching and profile screens render without overflow', async ({ page }) => {
   await page.goto('/options.html?demo=unmatched&view=matches');
   await expect(page.getByRole('heading', { name: 'Make the connection.' })).toBeVisible();
