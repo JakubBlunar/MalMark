@@ -1,5 +1,6 @@
 import type { Anime, Settings, WatchProgress } from '../shared/types';
 import { isComplete } from '../shared/progress';
+import { progressUpdateValues } from '../shared/list-status';
 import { getAnime, updateAnime } from './mal';
 import { getAuth } from './storage';
 
@@ -8,11 +9,10 @@ type Result = { kind: 'manual' | 'updated' | 'already-logged'; anime: Anime; err
 function nextEpisode(anime: Anime, episode: number): boolean {
   const list = anime.my_list_status;
   return (
-    !!list &&
-    list.status === 'watching' &&
-    !list.is_rewatching &&
-    Number.isInteger(list.num_episodes_watched) &&
-    episode === list.num_episodes_watched + 1 &&
+    (!list || list.status !== 'on_hold') &&
+    !list?.is_rewatching &&
+    Number.isInteger(list?.num_episodes_watched ?? 0) &&
+    episode === (list?.num_episodes_watched ?? 0) + 1 &&
     (!anime.num_episodes || episode <= anime.num_episodes)
   );
 }
@@ -33,13 +33,18 @@ export async function automaticProgress(
   try {
     const account = (await getAuth())?.profile?.id;
     fresh = await getAnime(anime.id);
+    if (anime.my_list_status && !fresh.my_list_status) return { kind: 'manual', anime: fresh };
     if (fresh.my_list_status && fresh.my_list_status.num_episodes_watched >= episode)
       return { kind: 'already-logged', anime: fresh };
     if (!nextEpisode(fresh, episode)) return { kind: 'manual', anime: fresh };
     if (account === undefined || (await getAuth())?.profile?.id !== account)
       throw new Error('The connected account changed. Review this update in Malmark.');
-    const updated = await updateAnime(anime.id, { num_watched_episodes: episode });
-    if (updated.num_episodes_watched !== episode)
+    const values = progressUpdateValues(fresh, episode);
+    const updated = await updateAnime(anime.id, values);
+    if (
+      updated.num_episodes_watched !== episode ||
+      (values.status && updated.status !== values.status)
+    )
       throw new Error(
         'MyAnimeList did not confirm the new episode count. Review this update in Malmark.',
       );

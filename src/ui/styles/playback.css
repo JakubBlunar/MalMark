@@ -10,14 +10,14 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 13px;
   color: #b9bed1;
 }
 .progress-label svg {
   color: var(--accent);
 }
 .progress-label > b {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   color: #c4b7f1;
 }
@@ -46,7 +46,7 @@
   display: flex;
   justify-content: space-between;
   color: #717b91;
-  font-size: 9px;
+  font-size: 11px;
 }
 .list-status {
   display: flex;
@@ -65,12 +65,12 @@
   gap: 1px;
 }
 .list-status b {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   text-transform: capitalize;
 }
 .list-status span {
-  font-size: 9px;
+  font-size: 11px;
   color: #7e889e;
 }
 .list-status .icon-button {
@@ -93,10 +93,10 @@
 }
 .watched-heading label {
   margin: 0;
-  font-size: 11px;
+  font-size: 13px;
 }
 .watched-heading .text-button {
-  font-size: 10px;
+  font-size: 12px;
 }
 .count-stepper {
   display: flex;
@@ -128,7 +128,7 @@
 }
 .watched-actions > .button {
   padding: 9px 12px;
-  font-size: 11px;
+  font-size: 13px;
 }
 .watched-control .helper {
   margin-top: 9px;
@@ -146,7 +146,7 @@
   justify-content: center;
   gap: 7px;
   color: #717b91;
-  font-size: 10px;
+  font-size: 12px;
 }
 .subtle-note svg {
   color: #8a819f;

@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark;
   font:
-    14px/1.45 system-ui,
+    16px/1.45 system-ui,
     sans-serif;
   color: #f3f3fa;
   background: transparent;
@@ -26,7 +26,7 @@ main {
 }
 h1 {
   margin: 7px 0;
-  font-size: 17px;
+  font-size: 19px;
 }
 p {
   margin: 8px 0;
@@ -44,7 +44,7 @@ p {
   margin-top: 14px;
 }
 button {
-  font: 600 13px system-ui;
+  font: 600 15px system-ui;
   border: 0;
   border-radius: 8px;
   padding: 10px 14px;
@@ -68,7 +68,7 @@ small {
   display: block;
   margin-top: 10px;
   color: #b1b4c5;
-  font-size: 12px;
+  font-size: 14px;
 }
 .warning,
 .error {

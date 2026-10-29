@@ -63,8 +63,10 @@ export function PreferencesForm({
           <span>
             <b>Automatic progress updates</b>
             <small>
-              Log only the next episode of anime in Currently Watching after reaching the threshold.
-              Other cases ask for confirmation. Success appears for four seconds.
+              Log the next episode after reaching the threshold, including new anime and Plan to
+              Watch titles. These move to Currently Watching when progress is saved. Completed and
+              Dropped keep their status; fully logged titles stay untouched. Gaps and On Hold ask
+              for confirmation. Success appears for four seconds.
             </small>
           </span>
           <input

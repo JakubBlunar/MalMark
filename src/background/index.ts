@@ -12,6 +12,7 @@ import { findMapping, positiveInteger, prefixMatches, siteForUrl } from '../shar
 import { automaticMatch, titleForSeason } from '../shared/matching';
 import { accumulate, emptyProgress, isComplete } from '../shared/progress';
 import { cancelLogin, connect, getAnime, searchAnime, updateAnime } from './mal';
+import { progressUpdateValues } from '../shared/list-status';
 import {
   getAuth,
   getLoginClientId,
@@ -33,6 +34,7 @@ import {
   discardWatchProgress,
   pruneWatchHistory,
   removeSiteProgress,
+  resetAnimeProgress,
   restoreWatchProgress,
   saveWatchProgress,
 } from './watch-history';
@@ -189,18 +191,12 @@ async function detectMessage(
 }
 
 async function completed(tabId: number, session: WatchSession): Promise<void> {
-  if (
-    !session.anime ||
-    !session.episode ||
-    !session.anime.my_list_status ||
-    session.anime.my_list_status.is_rewatching
-  )
-    return;
+  if (!session.anime || !session.episode || session.anime.my_list_status?.is_rewatching) return;
   const settings = await getSettings();
   if (!isComplete(session.progress, settings)) return;
   let anime = session.anime;
   if (anime.num_episodes && session.episode > anime.num_episodes) return;
-  if (session.episode <= anime.my_list_status!.num_episodes_watched) return;
+  if (session.episode <= (anime.my_list_status?.num_episodes_watched ?? 0)) return;
   const auth = await getAuth();
   if (!auth) return;
   const key = `${auth.profile?.id}:${anime.id}:${session.episode}`;
@@ -235,7 +231,7 @@ async function completed(tabId: number, session: WatchSession): Promise<void> {
     await resolvePending(item);
     return;
   }
-  if (!anime.my_list_status || anime.my_list_status.is_rewatching) {
+  if (anime.my_list_status?.is_rewatching) {
     await browser.tabs.sendMessage(tabId, { type: 'PROMPT_CHANGED' }).catch(() => undefined);
     return;
   }
@@ -456,6 +452,33 @@ async function refreshAnimeSessions(anime: Anime): Promise<void> {
   }
 }
 
+async function resetEpisodeTracking(animeId: number, watched: number): Promise<void> {
+  const account = (await getAuth())?.profile?.id;
+  const prefix = `${account}:${animeId}:`;
+  const { resolved = {} } = (await browser.storage.local.get('resolved')) as {
+    resolved?: Record<string, number>;
+  };
+  await resetAnimeProgress(animeId, watched);
+  await browser.storage.local.set({
+    pending: (await getPending()).filter((item) => item.anime.id !== animeId),
+    resolved: Object.fromEntries(
+      Object.entries(resolved).filter(
+        ([key]) => !key.startsWith(prefix) || Number(key.slice(prefix.length)) <= watched,
+      ),
+    ),
+  });
+  for (const [key, value] of Object.entries(await browser.storage.session.get(null))) {
+    const session = value as WatchSession;
+    if (!key.startsWith('tab:') || session.anime?.id !== animeId) continue;
+    const tabId = Number(key.slice(4));
+    if (session.episode && session.episode > watched)
+      await setSession(tabId, { ...session, progress: emptyProgress() });
+    await browser.storage.session.remove(`notice:${tabId}`);
+    await badge(tabId, await getSession(tabId));
+    await browser.tabs.sendMessage(tabId, { type: 'PROMPT_CHANGED' }).catch(() => undefined);
+  }
+}
+
 async function uiMessage(message: Message): Promise<unknown> {
   switch (message.type) {
     case 'GET_STATE':
@@ -608,7 +631,10 @@ async function uiMessage(message: Message): Promise<unknown> {
       const session = await getSession(message.tabId);
       if (!session?.anime) throw new Error('Match an anime first.');
       const anime = await getAnime(session.anime.id);
-      if (!anime.my_list_status || !['watching', 'completed'].includes(anime.my_list_status.status))
+      if (
+        !anime.my_list_status ||
+        ['plan_to_watch', 'on_hold'].includes(anime.my_list_status.status)
+      )
         anime.my_list_status = await updateAnime(anime.id, { status: 'watching' });
       session.anime = anime;
       await setSession(message.tabId, session);
@@ -627,20 +653,23 @@ async function uiMessage(message: Message): Promise<unknown> {
         throw new Error('Enter a valid watched episode count.');
       const anime = await getAnime(message.animeId);
       await refreshAnimeSessions(anime);
-      if (!anime.my_list_status)
-        throw new Error('Add this anime to Currently Watching before setting progress.');
-      if (anime.my_list_status.is_rewatching)
+      if (anime.my_list_status?.is_rewatching)
         throw new Error('Rewatch progress needs to be updated on MyAnimeList.');
       if (anime.num_episodes && message.episode > anime.num_episodes)
         throw new Error('The watched count exceeds this MAL entry.');
-      if (anime.my_list_status.num_episodes_watched !== message.expectedPrevious)
+      const watched = anime.my_list_status?.num_episodes_watched ?? 0;
+      if (watched !== message.expectedPrevious)
         throw new Error(
-          `MAL now has ${anime.my_list_status.num_episodes_watched} watched episodes. Review the refreshed count and save again.`,
+          `MAL now has ${watched} watched episodes. Review the refreshed count and save again.`,
         );
       if (message.episode !== message.expectedPrevious)
-        anime.my_list_status = await updateAnime(anime.id, {
-          num_watched_episodes: message.episode,
-        });
+        anime.my_list_status = await updateAnime(
+          anime.id,
+          message.episode > watched
+            ? progressUpdateValues(anime, message.episode)
+            : { num_watched_episodes: message.episode },
+        );
+      if (message.episode < watched) await resetEpisodeTracking(anime.id, message.episode);
       await refreshAnimeSessions(anime);
       for (const item of await getPending())
         if (item.anime.id === anime.id && item.episode <= message.episode)
@@ -712,18 +741,19 @@ async function uiMessage(message: Message): Promise<unknown> {
       if (!pending || !auth || !pending.id.startsWith(`${auth.profile?.id}:`))
         throw new Error('This update is no longer available for this account.');
       const anime = await getAnime(pending.anime.id);
-      if (!anime.my_list_status)
+      if (!anime.my_list_status && pending.anime.my_list_status)
         throw new Error(
           'This anime is no longer in your list. Add it to Currently Watching first.',
         );
-      if (anime.my_list_status.is_rewatching)
+      if (anime.my_list_status?.is_rewatching)
         throw new Error('Rewatch progress needs to be updated on MyAnimeList.');
       if (anime.num_episodes && pending.episode > anime.num_episodes)
         throw new Error('The episode exceeds this MAL entry. Correct the match first.');
-      if (pending.episode > anime.my_list_status.num_episodes_watched)
-        anime.my_list_status = await updateAnime(anime.id, {
-          num_watched_episodes: pending.episode,
-        });
+      if (pending.episode > (anime.my_list_status?.num_episodes_watched ?? 0))
+        anime.my_list_status = await updateAnime(
+          anime.id,
+          progressUpdateValues(anime, pending.episode),
+        );
       // Refresh every open tab for the same anime, not just the tab that completed.
       await refreshAnimeSessions(anime);
       await resolvePending(pending);

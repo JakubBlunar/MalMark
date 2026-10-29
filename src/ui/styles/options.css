@@ -50,14 +50,14 @@ body.full-page {
   color: #6f6982;
 }
 .sidebar-note p {
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1.3;
   color: #a69bbd;
   letter-spacing: -0.4px;
   margin: 12px 0;
 }
 .sidebar-note small {
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.8;
   color: #667086;
 }
@@ -72,7 +72,7 @@ body.full-page {
   height: 180px;
 }
 .full-page .anime-copy h1 {
-  font-size: 27px;
+  font-size: 29px;
 }
 .full-page .anime-copy {
   padding-left: 3px;
@@ -97,7 +97,7 @@ body.full-page {
   margin-bottom: 28px;
 }
 .full-page .page-title h1 {
-  font-size: 30px;
+  font-size: 32px;
 }
 .full-page footer {
   padding: 16px 36px;
@@ -106,7 +106,7 @@ body.full-page {
   padding: 35px;
 }
 .full-page .onboarding h1 {
-  font-size: 36px;
+  font-size: 38px;
 }
 .full-page .section-heading {
   margin-bottom: 20px;
@@ -121,7 +121,7 @@ body.full-page {
   padding: 0 32px;
 }
 .full-page .how-it-works p {
-  font-size: 11px;
+  font-size: 13px;
 }
 @media (max-width: 680px) {
   .full-page .app-layout {
@@ -157,7 +157,7 @@ body.full-page {
     height: 148px;
   }
   .full-page .anime-copy h1 {
-    font-size: 22px;
+    font-size: 24px;
   }
   .full-page .settings-section {
     padding: 20px;
@@ -170,7 +170,7 @@ body.full-page {
     padding: 20px;
   }
   .full-page .eyebrow {
-    font-size: 8px;
+    font-size: 11px;
   }
   .full-page .header-actions {
     gap: 8px;

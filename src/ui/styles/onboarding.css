@@ -74,18 +74,18 @@
   position: absolute;
   bottom: 2px;
   letter-spacing: 2.5px;
-  font-size: 7px;
+  font-size: 11px;
   font-weight: 700;
   color: #5e5d78;
 }
 .onboarding h1 {
-  font-size: 29px;
+  font-size: 31px;
   line-height: 1.22;
   letter-spacing: -1px;
   margin: 10px 0 12px;
 }
 .onboarding > p {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.8;
   margin-bottom: 22px;
   color: #a1a6ba;
@@ -95,7 +95,7 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  font-size: 9px;
+  font-size: 11px;
   color: #a1a5b4;
   margin-top: 18px;
 }
@@ -109,14 +109,14 @@
 }
 .cr-mark {
   color: #f4a676;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1;
 }
 .detected-line {
   padding: 10px 0 17px;
   display: flex;
   gap: 7px;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--mint);
 }
 .detected-line span {
@@ -136,13 +136,13 @@
   text-align: center;
 }
 .how-it-works span {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 1px;
   color: #786b9d;
 }
 .how-it-works p {
-  font-size: 9px;
+  font-size: 11px;
   color: #848b9e;
   margin-top: 6px;
 }

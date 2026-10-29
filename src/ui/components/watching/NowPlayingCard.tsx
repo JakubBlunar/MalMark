@@ -52,7 +52,7 @@ export function NowPlayingCard({
           watch count intact.
         </p>
       )}
-      {anime?.my_list_status && !anime.my_list_status.is_rewatching && (
+      {anime && !anime.my_list_status?.is_rewatching && (
         <WatchedCountControl anime={anime} episode={s.episode} busy={busy} act={act} />
       )}
       {anime && <CompleteAnimeControl key={anime.id} anime={anime} busy={busy} act={act} />}

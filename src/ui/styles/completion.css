@@ -9,12 +9,12 @@
   gap: 7px;
   margin-bottom: 12px;
   color: var(--mint);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 550;
 }
 .completion-control p {
   color: #a4b7ad;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.7;
 }
 .completion-control label {

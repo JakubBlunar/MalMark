@@ -3,6 +3,7 @@ import { Check, Minus, Plus } from 'lucide-react';
 import type { Anime } from '../../../shared/types';
 import type { Act } from '../../types';
 import { Spinner } from '../shared/Spinner';
+import { progressListNote } from '../../lib/display';
 
 export function WatchedCountControl({
   anime,
@@ -15,11 +16,12 @@ export function WatchedCountControl({
   busy: string;
   act: Act;
 }) {
-  const watched = anime.my_list_status!.num_episodes_watched;
+  const watched = anime.my_list_status?.num_episodes_watched ?? 0;
   const [count, setCount] = useState(String(watched));
   useEffect(() => setCount(String(watched)), [anime.id, watched]);
   const target = Number(count);
   const max = anime.num_episodes || 10000;
+  const fullyLogged = !!anime.num_episodes && watched >= anime.num_episodes;
   const valid = count !== '' && Number.isInteger(target) && target >= 0 && target <= max;
   return (
     <form
@@ -85,8 +87,16 @@ export function WatchedCountControl({
       <p className={`helper ${valid && target < watched ? 'warning-text' : ''}`}>
         {valid && target !== watched
           ? `${target < watched ? 'Reduces' : 'Updates'} your watched total from ${watched} to ${target}.`
-          : 'Adjust the total anytime, even if the player skipped ahead.'}
+          : fullyLogged
+            ? 'Already fully logged. Rewatching keeps this total unless you save a different count.'
+            : 'Adjust the total anytime, even if the player skipped ahead.'}
       </p>
+      {valid && target < watched && (
+        <p className="helper">Later episodes will be tracked again from this count.</p>
+      )}
+      {valid && target > watched && progressListNote(anime) && (
+        <p className="helper">{progressListNote(anime)}</p>
+      )}
     </form>
   );
 }

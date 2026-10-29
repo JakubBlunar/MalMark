@@ -3,10 +3,10 @@
 }
 .site-setup-card > h2 {
   margin: 15px 0 9px;
-  font-size: 20px;
+  font-size: 22px;
 }
 .site-setup-card > p {
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.8;
 }
 .site-setup-card .setup-steps {
@@ -28,14 +28,14 @@
   transform: rotate(-3deg);
 }
 .setup-illustration span {
-  font-size: 12px;
+  font-size: 14px;
   border: 1px dashed #9f89d3;
   padding: 5px 10px;
   background: #2e263c;
   border-radius: 4px;
 }
 .setup-illustration span.fake-episode {
-  font-size: 10px;
+  font-size: 12px;
   align-self: flex-start;
   color: #9fceba;
   border-color: #628e7d;
@@ -48,7 +48,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: 13px;
   color: #c0b3de;
   margin: 20px 0 13px;
   background: #12151d;
@@ -69,11 +69,11 @@
   border-top: 1px solid var(--border);
 }
 .builtin-sites b {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
 }
 .builtin-sites small {
-  font-size: 8px;
+  font-size: 11px;
   letter-spacing: 1px;
   color: #7b849b;
   margin-left: auto;
@@ -88,26 +88,26 @@
   color: #b6a8d8;
 }
 .custom-site-heading > b {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .custom-site summary {
-  font-size: 10px;
+  font-size: 12px;
   color: #939bb0;
   cursor: pointer;
   margin-top: 14px;
 }
 .custom-site label {
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 12px;
 }
 .custom-site code {
   display: block;
   overflow-wrap: anywhere;
-  font-size: 10px;
+  font-size: 12px;
   background: #12151d;
   border-radius: 6px;
   padding: 9px;

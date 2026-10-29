@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { PendingUpdate } from '../../shared/types';
 import { request } from '../services/extension';
+import { progressListNote } from '../lib/display';
 import './prompt.css';
 
 function EpisodePrompt() {
@@ -72,6 +73,7 @@ function EpisodePrompt() {
             Update MyAnimeList from <b>{item.previous}</b> to <b>{item.episode}</b> watched
             episodes?
           </p>
+          {progressListNote(item.anime) && <p>{progressListNote(item.anime)}</p>}
           {item.episode > item.previous + 1 && (
             <p className="warning">
               This also marks episodes {item.previous + 1}–{item.episode - 1} as watched.

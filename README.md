@@ -9,7 +9,9 @@ A browser extension for Chrome, Brave and Firefox that detects the anime you’r
 - Restored/activated tabs and opening Malmark retry tracker connections. The badge shows ✓ for a match with recent player data, or … while waiting for the player.
 - Manual watched-count controls and reminders that survive autoplay.
 - Update progress directly from an episode reminder, or choose Later to keep it queued in Malmark.
-- Opt into automatic progress for the next episode of an anime in Currently Watching, with a four-second success notice. Gaps and failed updates stay queued for confirmation; completion and scores remain manual.
+- Saving episode progress adds missing titles to Currently Watching and moves Plan to Watch or On Hold titles there. Completed and Dropped keep their status.
+- Opt into automatic progress for exactly the next episode after the saved count, or episode 1 of a new title, with a four-second success notice. Completed and Dropped retain their status. Gaps, On Hold and failed updates stay queued for confirmation; completion and scores remain manual.
+- Rewatching a fully logged title leaves its MAL episode total untouched. Manually saving a lower count resets later playback checkpoints and reminders so tracking can continue from that count. MAL's explicit rewatch mode remains managed on MyAnimeList.
 - Complete and optionally score finished-airing anime after the final episode.
 - A selector picker for websites you choose to add, with permission per domain.
 

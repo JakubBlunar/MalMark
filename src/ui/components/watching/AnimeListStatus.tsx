@@ -44,7 +44,8 @@ export function AnimeListStatus({
           <div className="add-watching">
             <h3>A new addition to your list?</h3>
             <p>
-              Add this anime to Currently Watching. Progress is only updated after you approve it.
+              Saving episode progress adds this anime to Currently Watching automatically. You can
+              also add it now without logging an episode.
             </p>
             <button
               disabled={!!busy}

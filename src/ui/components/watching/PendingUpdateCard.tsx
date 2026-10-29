@@ -2,6 +2,7 @@ import { ArrowRight, Check, CircleCheck } from 'lucide-react';
 import type { PendingUpdate } from '../../../shared/types';
 import type { Act } from '../../types';
 import { Spinner } from '../shared/Spinner';
+import { progressListNote } from '../../lib/display';
 import { CompleteAnimeControl } from './CompleteAnimeControl';
 
 export function PendingUpdateCard({
@@ -20,6 +21,7 @@ export function PendingUpdateCard({
       </div>
       <h2>Another episode, in the books.</h2>
       <p>{item.anime.alternative_titles?.en || item.anime.title}</p>
+      {progressListNote(item.anime) && <p className="helper">{progressListNote(item.anime)}</p>}
       {item.error && (
         <p className="helper warning-text" role="alert">
           {item.error}

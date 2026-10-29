@@ -1287,6 +1287,72 @@ describe('background consent boundary', () => {
     expect(fetch.mock.calls[1][1].body).toBe('num_watched_episodes=2');
     expect(mock.getLocal().pending).toEqual([]);
   });
+  it.each(['new', 'plan_to_watch', 'on_hold', 'completed', 'dropped'] as const)(
+    'saves progress and applies the correct list status for %s',
+    async (state) => {
+      const entry: Anime = {
+        ...anime,
+        my_list_status:
+          state === 'new'
+            ? undefined
+            : {
+                status: state,
+                num_episodes_watched: 0,
+                score: 9,
+              },
+      };
+      const expectedStatus = ['new', 'plan_to_watch', 'on_hold'].includes(state)
+        ? 'watching'
+        : state;
+      for (const type of ['APPROVE_UPDATE', 'SET_WATCHED'] as const) {
+        await mock.browser.storage.session.set({ 'tab:1': { ...session(), anime: entry } });
+        await mock.browser.storage.local.set({
+          pending: [
+            {
+              id: '5:1:2',
+              anime: entry,
+              episode: 2,
+              previous: 0,
+              createdAt: Date.now(),
+              tabId: 1,
+            },
+          ],
+        });
+        const status = { status: expectedStatus, num_episodes_watched: 2, score: 9 };
+        const fetch = vi
+          .fn()
+          .mockResolvedValueOnce(json(entry))
+          .mockResolvedValueOnce(json(status));
+        vi.stubGlobal('fetch', fetch);
+        const reply = await message(
+          type === 'APPROVE_UPDATE'
+            ? { type, id: '5:1:2' }
+            : { type, animeId: 1, episode: 2, expectedPrevious: 0 },
+        );
+        expect(reply.ok).toBe(true);
+        const fields = new URLSearchParams(fetch.mock.calls[1][1].body);
+        expect(fields.get('num_watched_episodes')).toBe('2');
+        expect(fields.get('status')).toBe(expectedStatus === 'watching' ? 'watching' : null);
+        expect(fields.has('score')).toBe(false);
+        expect((mock.getSession()['tab:1'] as WatchSession).anime?.my_list_status).toEqual(status);
+        expect(mock.getLocal().pending).toEqual([]);
+      }
+    },
+  );
+  it.each(['completed', 'dropped'] as const)(
+    'keeps %s when Add Watching is invoked',
+    async (status) => {
+      const entry = { ...anime, my_list_status: { ...anime.my_list_status!, status } };
+      await mock.browser.storage.session.set({ 'tab:1': { ...session(), anime: entry } });
+      const fetch = vi.fn().mockResolvedValueOnce(json(entry));
+      vi.stubGlobal('fetch', fetch);
+      expect((await message({ type: 'ADD_WATCHING', tabId: 1 })).ok).toBe(true);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect((mock.getSession()['tab:1'] as WatchSession).anime?.my_list_status?.status).toBe(
+        status,
+      );
+    },
+  );
   it('does not lower progress if MAL already has a higher count', async () => {
     await mock.browser.storage.local.set({
       pending: [{ id: '5:1:2', anime, episode: 2, previous: 1, createdAt: Date.now(), tabId: 1 }],
@@ -1419,6 +1485,162 @@ describe('opt-in automatic progress', () => {
     expect(expired.ok && expired.data.notice).toBeUndefined();
     expect(mock.getSession()['notice:1']).toBeUndefined();
   });
+  it.each(['new', 'plan_to_watch'] as const)(
+    'automatically starts %s after episode one is watched',
+    async (state) => {
+      const entry: Anime = {
+        ...anime,
+        my_list_status:
+          state === 'new'
+            ? undefined
+            : {
+                status: 'plan_to_watch',
+                num_episodes_watched: 0,
+                score: 9,
+              },
+      };
+      const s = await prepare(entry);
+      s.episode = 1;
+      await mock.browser.storage.session.set({ 'tab:1': s });
+      const status = { status: 'watching', num_episodes_watched: 1, score: 9 };
+      const fetch = vi.fn().mockResolvedValueOnce(json(entry)).mockResolvedValueOnce(json(status));
+      vi.stubGlobal('fetch', fetch);
+      await Promise.all([tick(), tick()]);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(fetch.mock.calls[1][1].body).toBe('num_watched_episodes=1&status=watching');
+      expect(mock.getLocal().pending ?? []).toEqual([]);
+      expect((mock.getSession()['tab:1'] as WatchSession).anime?.my_list_status).toEqual(status);
+      expect(mock.getSession()['notice:1']).toEqual(expect.objectContaining({ episode: 1 }));
+    },
+  );
+  it.each(['completed', 'dropped'] as const)(
+    'automatically continues %s only at the next saved episode, keeping status',
+    async (status) => {
+      const entry = { ...anime, my_list_status: { ...anime.my_list_status!, status } };
+      await prepare(entry);
+      const updated = { ...entry.my_list_status, num_episodes_watched: 2 };
+      const fetch = vi.fn().mockResolvedValueOnce(json(entry)).mockResolvedValueOnce(json(updated));
+      vi.stubGlobal('fetch', fetch);
+      await tick();
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(fetch.mock.calls[1][1].body).toBe('num_watched_episodes=2');
+      expect((mock.getSession()['tab:1'] as WatchSession).anime?.my_list_status).toEqual(updated);
+      expect(mock.getLocal().pending ?? []).toEqual([]);
+    },
+  );
+  it.each(['completed', 'dropped'] as const)(
+    'never rewrites maxed-out %s progress or prompts for earlier episodes',
+    async (status) => {
+      const entry = {
+        ...anime,
+        my_list_status: { ...anime.my_list_status!, status, num_episodes_watched: 12 },
+      };
+      const s = await prepare(entry);
+      const fetch = vi.fn();
+      vi.stubGlobal('fetch', fetch);
+      for (const episode of [1, 2, 12]) {
+        s.episode = episode;
+        await mock.browser.storage.session.set({ 'tab:1': s });
+        await tick();
+      }
+      expect(fetch).not.toHaveBeenCalled();
+      expect(mock.getLocal().pending ?? []).toEqual([]);
+      expect(mock.getSession()['notice:1']).toBeUndefined();
+    },
+  );
+  it.each(['completed', 'dropped'] as const)(
+    'queues a gap for %s without guessing rewatch progress',
+    async (status) => {
+      const s = await prepare({ my_list_status: { ...anime.my_list_status!, status } });
+      s.episode = 3;
+      await mock.browser.storage.session.set({ 'tab:1': s });
+      const fetch = vi.fn();
+      vi.stubGlobal('fetch', fetch);
+      await tick();
+      expect(fetch).not.toHaveBeenCalled();
+      expect(mock.getLocal().pending).toEqual([
+        expect.objectContaining({ episode: 3, previous: 1 }),
+      ]);
+    },
+  );
+  it('allows a manual reset to episode one, then tracks episode two with fresh playback', async () => {
+    const entry = {
+      ...anime,
+      my_list_status: {
+        ...anime.my_list_status!,
+        status: 'completed' as const,
+        num_episodes_watched: 12,
+      },
+    };
+    const s = await prepare(entry);
+    await mock.browser.storage.session.set({
+      'tab:2': { ...s },
+      'tab:3': { ...s, anime: { ...anime, id: 99 } },
+    });
+    await saveWatchProgress(s);
+    await mock.browser.storage.local.set({
+      resolved: { '5:1:2': Date.now(), '5:1:12': Date.now(), '5:99:2': Date.now() },
+      pending: [
+        { id: '5:1:3', anime: entry, episode: 3, previous: 1, tabId: 1, createdAt: Date.now() },
+      ],
+    });
+    const reset = { ...entry.my_list_status, num_episodes_watched: 1 };
+    const fetch = vi.fn().mockResolvedValueOnce(json(entry)).mockResolvedValueOnce(json(reset));
+    vi.stubGlobal('fetch', fetch);
+    expect(
+      (await message({ type: 'SET_WATCHED', animeId: 1, episode: 1, expectedPrevious: 12 })).ok,
+    ).toBe(true);
+    expect(fetch.mock.calls[1][1].body).toBe('num_watched_episodes=1');
+    expect(mock.getLocal().pending).toEqual([]);
+    expect(mock.getLocal().resolved).toEqual({ '5:99:2': expect.any(Number) });
+    expect(mock.getLocal().watchHistory).toEqual([]);
+    for (const tab of [1, 2]) {
+      const resetSession = mock.getSession()[`tab:${tab}`] as WatchSession;
+      expect(resetSession.progress.watched).toBe(0);
+      expect(resetSession.anime?.my_list_status).toEqual(reset);
+    }
+    expect((mock.getSession()['tab:3'] as WatchSession).progress.watched).toBe(900);
+    // An old qualifying checkpoint must not immediately log the next episode.
+    await tick();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const resumed = mock.getSession()['tab:1'] as WatchSession;
+    resumed.progress = { ranges: [[0, 900]], watched: 900, duration: 1000, position: 900 };
+    await mock.browser.storage.session.set({ 'tab:1': resumed });
+    const updated = { ...reset, num_episodes_watched: 2 };
+    fetch
+      .mockResolvedValueOnce(json({ ...entry, my_list_status: reset }))
+      .mockResolvedValueOnce(json(updated));
+    await tick();
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(fetch.mock.calls[3][1].body).toBe('num_watched_episodes=2');
+    expect((mock.getSession()['tab:1'] as WatchSession).anime?.my_list_status).toEqual(updated);
+  });
+  it.each(['new', 'plan_to_watch'] as const)(
+    'queues %s until confirmation when automatic progress is off',
+    async (state) => {
+      const s = await prepare({
+        my_list_status:
+          state === 'new'
+            ? undefined
+            : {
+                status: 'plan_to_watch',
+                num_episodes_watched: 0,
+              },
+      });
+      s.episode = 1;
+      await mock.browser.storage.session.set({ 'tab:1': s });
+      await mock.browser.storage.local.set({
+        settings: { ...(await getSettings()), autoProgress: false },
+      });
+      const fetch = vi.fn();
+      vi.stubGlobal('fetch', fetch);
+      await tick();
+      expect(fetch).not.toHaveBeenCalled();
+      expect(mock.getLocal().pending).toEqual([
+        expect.objectContaining({ episode: 1, previous: 0 }),
+      ]);
+    },
+  );
   it.each(['off', 'gap', 'already-watched', 'new-anime', 'on-hold', 'rewatching', 'end-only'])(
     'keeps the existing flow for %s',
     async (condition) => {
@@ -1450,7 +1672,7 @@ describe('opt-in automatic progress', () => {
       await tick(condition === 'end-only' ? 990 : 900);
       expect(fetch).not.toHaveBeenCalled();
       expect(mock.getSession()['notice:1']).toBeUndefined();
-      const manual = ['off', 'gap', 'on-hold', 'end-only'].includes(condition);
+      const manual = ['off', 'gap', 'new-anime', 'on-hold', 'end-only'].includes(condition);
       expect((mock.getLocal().pending as unknown[] | undefined)?.length ?? 0).toBe(manual ? 1 : 0);
     },
   );
@@ -1476,9 +1698,9 @@ describe('opt-in automatic progress', () => {
       expect(fetch).toHaveBeenCalledTimes(1);
       expect(mock.getSession()['notice:1']).toBeUndefined();
       expect((mock.getSession()['tab:1'] as WatchSession).anime).toEqual(fresh);
-      if (change === 'gap' || change === 'on-hold')
+      if (change === 'gap' || change === 'on-hold' || change === 'removed')
         expect(mock.getLocal().pending).toEqual([
-          expect.objectContaining({ previous: fresh.my_list_status!.num_episodes_watched }),
+          expect.objectContaining({ previous: fresh.my_list_status?.num_episodes_watched ?? 0 }),
         ]);
       else expect(mock.getLocal().pending ?? []).toEqual([]);
     },

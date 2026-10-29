@@ -148,3 +148,13 @@ export async function removeSiteProgress(origin: string): Promise<void> {
     watchHistory: (await history()).filter((entry) => entry.origin !== origin),
   });
 }
+
+export async function resetAnimeProgress(animeId: number, watched: number): Promise<void> {
+  const account = (await getAuth())?.profile?.id;
+  if (account === undefined) return;
+  await browser.storage.local.set({
+    watchHistory: (await history()).filter(
+      (entry) => entry.account !== account || entry.animeId !== animeId || entry.episode <= watched,
+    ),
+  });
+}
