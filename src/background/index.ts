@@ -26,6 +26,7 @@ import {
 import { configForUrl, registerSite, retireLegacyAccess, supportedUrl } from './sites';
 import { chromiumSidePanel } from '../shared/sidebar';
 import { OAUTH_SETUP_REQUIRED } from '../shared/config';
+import { inlinePromptContext, inlinePromptNonce } from './inline-prompts';
 import {
   discardWatchProgress,
   pruneWatchHistory,
@@ -166,6 +167,9 @@ async function detectMessage(
   const changed = !previous || JSON.stringify(previous.detection) !== JSON.stringify(d);
   if (changed && previous) await completed(tabId, previous);
   const session = changed ? await resolve(d, previous) : previous;
+  // A MAL lookup can finish after autoplay has already changed the watch URL.
+  const currentTab = await browser.tabs.get(tabId);
+  if (!currentTab.url || !samePage(currentTab.url, message.pageUrl)) return;
   session.frameOrigins = Array.isArray(message.frameOrigins)
     ? message.frameOrigins
         .filter((o) => {
@@ -755,6 +759,32 @@ browser.runtime.onMessage.addListener((raw: unknown, sender: browser.Runtime.Mes
       }
       return serialized(() => uiMessage(message));
     }
+    if (message.type === 'INLINE_PROMPT_SIZE') {
+      if (!Number.isFinite(message.height) || message.height <= 0) return;
+      const { item, parentFrameId } = await inlinePromptContext(message.nonce, sender);
+      // Deliver only to the content script containing this verified extension frame.
+      await browser.tabs
+        .sendMessage(item.tabId, message, { frameId: parentFrameId })
+        .catch(() => undefined);
+      return;
+    }
+    if (message.type === 'GET_INLINE_PROMPT' || message.type === 'INLINE_PROMPT_ACTION')
+      return serialized(async () => {
+        const { item } = await inlinePromptContext(message.nonce, sender);
+        if (message.type === 'GET_INLINE_PROMPT') return item;
+        if (message.action === 'approve') await uiMessage({ type: 'APPROVE_UPDATE', id: item.id });
+        else if (message.action === 'later') {
+          await browser.storage.local.set({
+            pending: (await getPending()).map((p) =>
+              p.id === item.id ? { ...p, deferred: true } : p,
+            ),
+          });
+          await browser.tabs
+            .sendMessage(item.tabId, { type: 'PROMPT_CHANGED' })
+            .catch(() => undefined);
+        } else throw new Error('Unknown reminder action.');
+        await browser.storage.session.remove(`inlinePrompt:${item.tabId}`);
+      });
     if (message.type === 'DETECTION') return serialized(() => detectMessage(message, sender));
     if (message.type === 'PLAYBACK') return serialized(() => playbackMessage(message, sender));
     if (message.type === 'GET_SITE_CONFIG')
@@ -842,17 +872,24 @@ browser.runtime.onMessage.addListener((raw: unknown, sender: browser.Runtime.Mes
           url: browser.runtime.getURL(`options.html?tab=${sender.tab.id}&view=watching`),
         });
       }
-      const session = await getSession(sender.tab.id);
-      return {
-        pending: (await getAuth())
-          ? (await getPending()).filter((p) => p.tabId === sender.tab!.id)
-          : [],
-        showPrompts: (await getSettings()).showPrompts,
-        newAnime:
-          session?.anime && !session.anime.my_list_status
-            ? { id: session.anime.id, title: session.anime.title }
+      return serialized(async () => {
+        const session = await getSession(sender.tab!.id!);
+        const pending = (await getAuth())
+          ? (await getPending()).filter((p) => p.tabId === sender.tab!.id && !p.deferred)
+          : [];
+        const item = pending.at(-1);
+        return {
+          pending,
+          nonce: item
+            ? await inlinePromptNonce(sender.tab!.id!, tab.url!, item, sender.frameId ?? 0)
             : undefined,
-      };
+          showPrompts: (await getSettings()).showPrompts,
+          newAnime:
+            session?.anime && !session.anime.my_list_status
+              ? { id: session.anime.id, title: session.anime.title }
+              : undefined,
+        };
+      });
     }
     throw new Error('This request is only available in the extension.');
   };
@@ -864,7 +901,24 @@ browser.runtime.onMessage.addListener((raw: unknown, sender: browser.Runtime.Mes
 
 browser.tabs.onRemoved.addListener((tabId) => {
   recovery.delete(tabId);
-  void serialized(() => browser.storage.session.remove(`tab:${tabId}`));
+  void serialized(() => browser.storage.session.remove([`tab:${tabId}`, `inlinePrompt:${tabId}`]));
+});
+
+browser.webNavigation.onHistoryStateUpdated.addListener((details) => {
+  if (details.frameId !== 0) return;
+  void serialized(async () => {
+    const previous = await getSession(details.tabId);
+    if (!(await supportedUrl(details.url))) return;
+    if (!previous || !samePage(previous.detection.url, details.url)) {
+      if (previous) await completed(details.tabId, previous);
+      await browser.storage.session.remove(`tab:${details.tabId}`);
+      await badge(details.tabId);
+    }
+    await browser.tabs
+      .sendMessage(details.tabId, { type: 'ROUTE_CHANGED', pageUrl: details.url })
+      .catch(() => undefined);
+    void recoverPlayer(details.tabId);
+  });
 });
 
 browser.webNavigation.onCommitted.addListener((details) => {

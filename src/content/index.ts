@@ -1,6 +1,6 @@
 import browser from 'webextension-polyfill';
 import { detect } from './detect';
-import type { Message, PendingUpdate, Reply, SiteConfig } from '../shared/types';
+import type { Message, PendingUpdate, Playback, Reply, SiteConfig } from '../shared/types';
 import { siteForUrl } from '../shared/sites';
 import { startPicker } from './picker';
 import { createPlayerTracker } from './player';
@@ -47,16 +47,25 @@ function start(): { stop: () => void } | undefined {
   let customConfig: SiteConfig | undefined;
   let configReady = false;
   let configLoading = false;
-  let scanPending = false;
+  let activeScan: symbol | undefined;
   let detectionAcknowledgedAt = 0;
   let lastUrl = location.href;
+  let parentUrl = '';
   let routeChangedAt = Date.now();
   let lastDetection = '';
   let candidate = '';
   let candidateAt = 0;
   let host: HTMLDivElement | undefined;
+  let promptFrame: HTMLIFrameElement | undefined;
+  let promptNonce = '';
+  let promptHeight = 220;
   const hiddenPrompts = new Set<string>();
 
+  function resizePrompt(): void {
+    if (!promptFrame?.isConnected) return;
+    const available = Math.max(1, (window.visualViewport?.height ?? window.innerHeight) - 48);
+    promptFrame.style.height = `${Math.min(promptHeight, available)}px`;
+  }
   function placePrompt(): void {
     if (!host) return;
     const fullscreen = document.fullscreenElement;
@@ -68,6 +77,7 @@ function start(): { stop: () => void } | undefined {
     host.style.display = hidden ? 'none' : 'block';
     const parent = !hidden && fullscreen ? fullscreen : document.documentElement;
     if (host.parentElement !== parent) parent.append(host);
+    resizePrompt();
   }
   async function prompt(): Promise<void> {
     if (!topPage && !document.fullscreenElement) {
@@ -79,9 +89,14 @@ function start(): { stop: () => void } | undefined {
       pending: PendingUpdate[];
       showPrompts: boolean;
       newAnime?: { id: number; title: string };
+      nonce?: string;
     }>({ type: 'PROMPT_STATE' });
     const item = state?.pending.at(-1);
-    const id = item?.id || (state?.newAnime ? `add:${state.newAnime.id}` : '');
+    const id = item
+      ? `${item.id}:${state?.nonce ?? ''}`
+      : state?.newAnime
+        ? `add:${state.newAnime.id}`
+        : '';
     if (!state?.showPrompts || !id || hiddenPrompts.has(id)) {
       host?.remove();
       host = undefined;
@@ -97,6 +112,20 @@ function start(): { stop: () => void } | undefined {
     host.dataset.prompt = id;
     host.style.cssText = 'all:initial;position:fixed;right:24px;bottom:24px;z-index:2147483647;';
     const shadow = host.attachShadow({ mode: 'closed' });
+    if (item && state.nonce) {
+      const frame = document.createElement('iframe');
+      frame.src = browser.runtime.getURL(`prompt.html#${state.nonce}`);
+      frame.title = 'Malmark episode update';
+      frame.referrerPolicy = 'no-referrer';
+      frame.style.cssText =
+        'border:0;display:block;width:min(360px,calc(100vw - 48px));height:220px;max-height:calc(100dvh - 48px);border-radius:16px;box-shadow:0 12px 40px #0007;';
+      promptFrame = frame;
+      promptNonce = state.nonce;
+      promptHeight = 220;
+      shadow.append(frame);
+      placePrompt();
+      return;
+    }
     const style = document.createElement('style');
     style.textContent =
       ':host{color-scheme:dark}.card{font:14px/1.5 system-ui,sans-serif;background:#181b24;color:#f3f3fa;border:1px solid #3d4256;border-radius:16px;padding:20px;width:min(320px,calc(100vw - 88px));box-shadow:0 12px 40px #0007}.tag{font-size:10px;letter-spacing:2px;color:#ac9fff;font-weight:700;margin-bottom:8px}strong{display:block;font-size:16px;margin-bottom:4px}p{color:#bbc0d0;margin:0 0 16px}button{font:600 13px system-ui;cursor:pointer;border:0;border-radius:8px;padding:10px 14px;background:#b4a4ff;color:#181326}button+button{background:transparent;color:#c0c4d2;margin-left:8px}button:focus-visible{outline:2px solid white;outline-offset:3px}';
@@ -149,12 +178,7 @@ function start(): { stop: () => void } | undefined {
   async function scanPage(force = false): Promise<void> {
     if (!topPage || !valid || !configReady || (!siteForUrl(location.href) && !customConfig)) return;
     if (lastUrl !== location.href) {
-      lastUrl = location.href;
-      routeChangedAt = Date.now();
-      lastDetection = '';
-      candidate = '';
-      host?.remove();
-      host = undefined;
+      resetRoute();
       await send({ type: 'DETECTION', detection: null, pageUrl: location.href, frameOrigins: [] });
       return;
     }
@@ -169,25 +193,26 @@ function start(): { stop: () => void } | undefined {
     }
     if (Date.now() - candidateAt < 800) return;
     if (
-      !scanPending &&
+      !activeScan &&
       (signature !== lastDetection || force || Date.now() - detectionAcknowledgedAt >= 10000)
     ) {
-      scanPending = true;
+      const scan = Symbol();
+      activeScan = scan;
       const pageUrl = location.href;
       try {
         const reply = await sendReply({ type: 'DETECTION', detection, pageUrl, frameOrigins });
-        if (reply?.ok && pageUrl === location.href) {
+        if (activeScan === scan && reply?.ok && pageUrl === location.href) {
           lastDetection = signature;
           detectionAcknowledgedAt = Date.now();
           players.scan(true);
           await prompt();
         }
       } finally {
-        scanPending = false;
+        if (activeScan === scan) activeScan = undefined;
       }
     }
   }
-  const players = createPlayerTracker((playback) => {
+  const reportPlayback = (playback: Playback) => {
     if (!valid) return;
     if (topPage && (lastUrl !== location.href || !lastDetection)) return;
     void send({
@@ -195,9 +220,50 @@ function start(): { stop: () => void } | undefined {
       pageUrl: location.href,
       playback,
     });
-  });
-  const listener = (message: unknown) => {
+  };
+  let players = createPlayerTracker(reportPlayback);
+  function resetRoute() {
+    lastUrl = location.href;
+    routeChangedAt = Date.now();
+    lastDetection = '';
+    candidate = '';
+    activeScan = undefined;
+    host?.remove();
+    host = undefined;
+    players.stop();
+    players = createPlayerTracker(reportPlayback);
+  }
+  const listener = (message: unknown, sender: browser.Runtime.MessageSender) => {
     if (!message || typeof message !== 'object' || !('type' in message)) return false;
+    if (
+      message.type === 'INLINE_PROMPT_SIZE' &&
+      sender?.id === browser.runtime.id &&
+      !sender.tab &&
+      'nonce' in message &&
+      message.nonce === promptNonce &&
+      'height' in message &&
+      typeof message.height === 'number' &&
+      Number.isFinite(message.height) &&
+      message.height > 0
+    ) {
+      promptHeight = Math.ceil(message.height);
+      resizePrompt();
+    }
+    if (message.type === 'ROUTE_CHANGED') {
+      if (topPage) {
+        if (lastUrl !== location.href) resetRoute();
+        void scanPage();
+      } else if (
+        'pageUrl' in message &&
+        typeof message.pageUrl === 'string' &&
+        parentUrl !== message.pageUrl
+      ) {
+        parentUrl = message.pageUrl;
+        players.stop();
+        players = createPlayerTracker(reportPlayback);
+        players.scan(true);
+      }
+    }
     if (message.type === 'PING_PLAYER') {
       if (valid) {
         players.scan(true);
@@ -247,6 +313,8 @@ function start(): { stop: () => void } | undefined {
   };
   browser.runtime.onMessage.addListener(listener);
   const events = new AbortController();
+  window.addEventListener('resize', resizePrompt, { signal: events.signal });
+  window.visualViewport?.addEventListener('resize', resizePrompt, { signal: events.signal });
   document.addEventListener('fullscreenchange', () => void prompt(), { signal: events.signal });
   window.addEventListener(
     'pageshow',

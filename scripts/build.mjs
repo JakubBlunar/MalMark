@@ -67,6 +67,7 @@ const base = {
     128: 'icons/icon-128.png',
   },
   options_ui: { page: 'options.html', open_in_tab: true },
+  web_accessible_resources: [{ resources: ['prompt.html', 'assets/*'], matches: ['https://*/*'] }],
   content_scripts: [
     { matches: sites, js: ['content.js'], run_at: 'document_idle', all_frames: true },
   ],

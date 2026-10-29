@@ -41,6 +41,7 @@ export function accumulate(
   if (
     frameChanged &&
     !progress.last?.paused &&
+    !progress.last?.ended &&
     sample.sentAt - (progress.last?.sentAt ?? 0) < 15000
   )
     return progress;

@@ -107,6 +107,7 @@ export interface PendingUpdate {
   episode: number;
   previous: number;
   createdAt: number;
+  deferred?: boolean;
   tabId: number;
 }
 
@@ -160,6 +161,9 @@ export type Message =
   | { type: 'RECHECK'; tabId: number }
   | { type: 'INJECT_PLAYERS'; tabId: number }
   | { type: 'PROMPT_STATE' }
+  | { type: 'GET_INLINE_PROMPT'; nonce: string }
+  | { type: 'INLINE_PROMPT_SIZE'; nonce: string; height: number }
+  | { type: 'INLINE_PROMPT_ACTION'; nonce: string; action: 'approve' | 'later' }
   | { type: 'OPEN_EXTENSION' };
 
 export type SetupMessage =

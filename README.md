@@ -8,6 +8,7 @@ A browser extension for Chrome, Brave and Firefox that detects the anime you’r
 - Partial episode progress survives page refreshes and browser restarts, including episodes already logged on MAL; old checkpoints expire after 30 days (100 episodes maximum).
 - Restored/activated tabs and opening Malmark retry tracker connections. The badge shows ✓ for a match with recent player data, or … while waiting for the player.
 - Manual watched-count controls and reminders that survive autoplay.
+- Update progress directly from an episode reminder, or choose Later to keep it queued in Malmark.
 - Complete and optionally score finished-airing anime after the final episode.
 - A selector picker for websites you choose to add, with permission per domain.
 

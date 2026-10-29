@@ -21,6 +21,7 @@ export async function reviewerSource(configuration) {
     'popup.html',
     'sidebar.html',
     'options.html',
+    'prompt.html',
     'README.md',
     'PRIVACY.md',
     'LICENSE',

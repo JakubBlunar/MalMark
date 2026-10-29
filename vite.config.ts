@@ -12,6 +12,7 @@ export default defineConfig({
         popup: resolve('popup.html'),
         options: resolve('options.html'),
         sidebar: resolve('sidebar.html'),
+        prompt: resolve('prompt.html'),
       },
     },
   },

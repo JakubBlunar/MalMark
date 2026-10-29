@@ -68,7 +68,11 @@ const mock = vi.hoisted(() => {
       registerContentScripts: vi.fn(),
       unregisterContentScripts: vi.fn(),
     },
-    webNavigation: { getAllFrames: vi.fn(async () => []), onCommitted: { addListener: vi.fn() } },
+    webNavigation: {
+      getAllFrames: vi.fn(async () => []),
+      onCommitted: { addListener: vi.fn() },
+      onHistoryStateUpdated: { addListener: vi.fn() },
+    },
   };
   return {
     browser,
@@ -124,6 +128,8 @@ const updatedListener = mock.browser.tabs.onUpdated.addListener.mock.calls[0][0]
   id: number,
   info: { status: string },
 ) => void;
+const historyListener = mock.browser.webNavigation.onHistoryStateUpdated.addListener.mock
+  .calls[0][0] as (details: { tabId: number; frameId: number; url: string }) => void;
 async function message<T = unknown>(
   value: unknown,
   sender: Record<string, unknown> = ui,
@@ -597,6 +603,102 @@ describe('finished series completion', () => {
 });
 
 describe('background consent boundary', () => {
+  async function reminder(parentFrameId = 0) {
+    const item: PendingUpdate = {
+      id: '5:1:2',
+      anime,
+      episode: 2,
+      previous: 1,
+      tabId: 1,
+      createdAt: Date.now(),
+    };
+    await mock.browser.storage.local.set({ pending: [item] });
+    if (parentFrameId) mock.browser.permissions.contains.mockResolvedValue(true);
+    const reply = await message<{ nonce: string }>(
+      { type: 'PROMPT_STATE' },
+      { ...content, frameId: parentFrameId },
+    );
+    if (!reply.ok) throw new Error(reply.error);
+    const nonce = reply.data.nonce;
+    const frame = { ...content, frameId: 3, url: `moz-extension://test/prompt.html#${nonce}` };
+    return { nonce, frame };
+  }
+  it('routes verified size changes only to the reminder iframe parent', async () => {
+    const { nonce, frame } = await reminder(7);
+    mock.browser.tabs.sendMessage.mockClear();
+    const size = { type: 'INLINE_PROMPT_SIZE', nonce, height: 268 };
+    expect((await message(size, frame)).ok).toBe(true);
+    expect(mock.browser.tabs.sendMessage).toHaveBeenCalledWith(1, size, { frameId: 7 });
+    mock.browser.tabs.sendMessage.mockClear();
+    expect((await message(size, content)).ok).toBe(false);
+    expect((await message({ ...size, nonce: 'forged' }, frame)).ok).toBe(false);
+    for (const height of [NaN, Infinity, 0, -1]) await message({ ...size, height }, frame);
+    expect(mock.browser.tabs.sendMessage).not.toHaveBeenCalled();
+  });
+  it('lets only the scoped extension reminder approve an update and never opens a tab', async () => {
+    const { nonce, frame } = await reminder();
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(json(anime))
+      .mockResolvedValueOnce(json({ ...anime.my_list_status, num_episodes_watched: 2 }));
+    vi.stubGlobal('fetch', fetch);
+    const action = { type: 'INLINE_PROMPT_ACTION', nonce, action: 'approve' };
+    for (const sender of [content, ui, { ...frame, tab: { id: 2 } }, { ...frame, frameId: 0 }])
+      expect((await message(action, sender)).ok).toBe(false);
+    expect((await message({ ...action, nonce: 'forged' }, frame)).ok).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+    expect((await message(action, frame)).ok).toBe(true);
+    expect(fetch.mock.calls[1][1].body).toBe('num_watched_episodes=2');
+    expect(mock.getLocal().pending).toEqual([]);
+    expect((await message(action, frame)).ok).toBe(false);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(mock.browser.tabs.create).not.toHaveBeenCalled();
+  });
+  it('Later hides the reminder across reloads but leaves the update queued in the extension', async () => {
+    const { nonce, frame } = await reminder();
+    expect(
+      (await message({ type: 'INLINE_PROMPT_ACTION', nonce, action: 'later' }, frame)).ok,
+    ).toBe(true);
+    expect(mock.getLocal().pending).toEqual([
+      expect.objectContaining({ id: '5:1:2', deferred: true }),
+    ]);
+    const state = await message<{ pending: PendingUpdate[] }>({ type: 'PROMPT_STATE' }, content);
+    expect(state.ok && state.data.pending).toEqual([]);
+    const popup = await message<{ pending: PendingUpdate[] }>({ type: 'GET_STATE', tabId: 1 });
+    expect(popup.ok && popup.data.pending[0].id).toBe('5:1:2');
+  });
+  it.each(['account', 'origin', 'expired', 'disabled'])(
+    'rejects a reminder after its %s changes',
+    async (change) => {
+      const { nonce, frame } = await reminder();
+      if (change === 'account')
+        await mock.browser.storage.local.set({ auth: { ...auth, profile: { id: 6 } } });
+      if (change === 'origin')
+        mock.browser.tabs.get.mockResolvedValue({ id: 1, url: 'https://evil.example/watch/1' });
+      if (change === 'expired') {
+        const grants = mock.getSession()['inlinePrompt:1'] as object[];
+        await mock.browser.storage.session.set({
+          'inlinePrompt:1': grants.map((grant) => ({ ...grant, expiresAt: Date.now() - 1 })),
+        });
+      }
+      if (change === 'disabled')
+        await mock.browser.storage.local.set({ settings: { showPrompts: false } });
+      expect((await message({ type: 'GET_INLINE_PROMPT', nonce }, frame)).ok).toBe(false);
+    },
+  );
+  it('notifies all player frames when the main watch URL changes through SPA history', async () => {
+    await mock.browser.storage.session.set({ 'tab:1': session() });
+    mock.browser.tabs.sendMessage.mockClear();
+    const url = 'https://www.crunchyroll.com/watch/NEXT/next';
+    historyListener({ tabId: 1, frameId: 0, url });
+    await vi.waitFor(() =>
+      expect(mock.browser.tabs.sendMessage).toHaveBeenCalledWith(1, {
+        type: 'ROUTE_CHANGED',
+        pageUrl: url,
+      }),
+    );
+    expect(mock.getSession()['tab:1']).toBeUndefined();
+  });
   it.each([false, true])(
     'restores logged-episode playback after refresh without another MAL update (rewatching: %s)',
     async (rewatching) => {

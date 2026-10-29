@@ -406,7 +406,7 @@ test('a failed iframe injection retries and discovers delayed shadow players and
             replacement.style.cssText = 'width:640px;height:360px';
             Object.defineProperties(replacement, {
               duration: { value: 1000 },
-              currentTime: { value: 25 },
+              currentTime: { value: 25, configurable: true },
               paused: { value: false },
             });
             root.append(replacement);
@@ -416,6 +416,32 @@ test('a failed iframe injection retries and discovers delayed shadow players and
       { tabId, frameId },
     );
     await expect.poll(async () => (await session(worker, tabId))?.progress?.position).toBe(25);
+    expect((await session(worker, tabId)).progress.watched).toBe(0);
+    const previousVideo = (await session(worker, tabId)).progress.last.videoId;
+    // Autoplay reuses the embedded document and its video while only the top URL changes.
+    await page.evaluate(() => {
+      history.pushState({}, '', '/watch/EP3/next');
+      document.querySelector('h1')!.textContent = 'Episode 3';
+    });
+    await worker.evaluate(
+      async ({ tabId, frameId }) => {
+        await (globalThis as any).chrome.scripting.executeScript({
+          target: { tabId, frameIds: [frameId] },
+          func: () => {
+            const videos = document
+              .querySelector('#shell')!
+              .shadowRoot!.querySelector('section')!
+              .shadowRoot!.querySelectorAll('video');
+            Object.defineProperty(videos[1], 'currentTime', { value: 0, configurable: true });
+          },
+        });
+      },
+      { tabId, frameId },
+    );
+    await expect.poll(async () => (await session(worker, tabId))?.episode).toBe(3);
+    await expect.poll(async () => (await session(worker, tabId))?.progress?.position).toBe(0);
+    await expect.poll(async () => (await session(worker, tabId))?.playerConnected).toBe(true);
+    expect((await session(worker, tabId)).progress.last.videoId).not.toBe(previousVideo);
     expect((await session(worker, tabId)).progress.watched).toBe(0);
   } finally {
     await context.close();

@@ -79,6 +79,14 @@ describe('watched time tracking', () => {
     ]);
     expect(p.watched).toBe(10);
   });
+  it('allows a new frame immediately after the previous player ends without crediting the jump', () => {
+    let p = accumulate(emptyProgress(), sample(990, 0), 0);
+    p = accumulate(p, sample(995, 5000, { ended: true }), 0);
+    p = accumulate(p, sample(100, 6000, { videoId: 'replacement' }), 2);
+    expect(p.frameId).toBe(2);
+    expect(p.watched).toBe(5);
+    expect(p.position).toBe(100);
+  });
   it('allows a replacement player without crediting its jump', () => {
     const p = accumulate(
       accumulate(emptyProgress(), sample(0, 0), 0),
