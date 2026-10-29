@@ -5,6 +5,7 @@ export function previewState(): PublicState {
   const state: PublicState = {
     settings: {
       autoProgress: false,
+      autoFinishDate: false,
       threshold: 65,
       minWatchSeconds: 60,
       showPrompts: true,

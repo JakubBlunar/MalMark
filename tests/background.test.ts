@@ -8,6 +8,7 @@ import type {
   WatchSession,
 } from '../src/shared/types';
 import { emptyProgress } from '../src/shared/progress';
+import { localDate } from '../src/shared/completion';
 
 const mock = vi.hoisted(() => {
   let local: Record<string, unknown> = {};
@@ -355,6 +356,7 @@ describe('OAuth and MAL transport', () => {
     expect((mock.getLocal().auth as Auth).clientId).toBe('client');
     expect(await getSettings()).toEqual({
       autoProgress: false,
+      autoFinishDate: false,
       threshold: 85,
       minWatchSeconds: 90,
       showPrompts: false,
@@ -367,6 +369,7 @@ describe('OAuth and MAL transport', () => {
     });
     expect(response.ok && response.data.settings).toEqual({
       autoProgress: false,
+      autoFinishDate: false,
       threshold: 90,
       minWatchSeconds: 60,
       showPrompts: true,
@@ -384,6 +387,7 @@ describe('OAuth and MAL transport', () => {
     expect((await message({ type: 'SAVE_SETTINGS', settings })).ok).toBe(true);
     expect(mock.getLocal().settings).toEqual({
       autoProgress: false,
+      autoFinishDate: false,
       threshold: 95,
       minWatchSeconds: 120,
       showPrompts: false,
@@ -592,6 +596,94 @@ describe('finished series completion', () => {
     vi.stubGlobal('fetch', fetch);
     expect((await message(complete, content)).ok).toBe(false);
     expect(fetch).not.toHaveBeenCalled();
+  });
+  it.each([undefined, null, ''])(
+    'sets a missing finish date (%s) only when the setting is enabled',
+    async (finish_date) => {
+      await mock.browser.storage.local.set({
+        settings: { ...(await getSettings()), autoFinishDate: true },
+      });
+      const entry = { ...finished, my_list_status: { ...finished.my_list_status!, finish_date } };
+      const today = localDate();
+      const updated = { ...entry.my_list_status, status: 'completed', finish_date: today };
+      const fetch = vi.fn().mockResolvedValueOnce(json(entry)).mockResolvedValueOnce(json(updated));
+      vi.stubGlobal('fetch', fetch);
+      expect((await message(complete)).ok).toBe(true);
+      const body = new URLSearchParams(fetch.mock.calls[1][1].body);
+      expect(body.get('finish_date')).toBe(today);
+      expect(body.get('status')).toBe('completed');
+      expect(body.get('num_watched_episodes')).toBe('12');
+      expect(body.has('score')).toBe(false);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(new URL(fetch.mock.calls[0][0]).searchParams.get('fields')).toContain('finish_date');
+    },
+  );
+  it.each(['2020-05-06', '2020-05-00'])(
+    'preserves the existing finish date %s from fresh MAL data',
+    async (finish_date) => {
+      await mock.browser.storage.local.set({
+        settings: { ...(await getSettings()), autoFinishDate: true },
+      });
+      const entry = { ...finished, my_list_status: { ...finished.my_list_status!, finish_date } };
+      const fetch = vi
+        .fn()
+        .mockResolvedValueOnce(json(entry))
+        .mockResolvedValueOnce(json({ ...entry.my_list_status, status: 'completed' }));
+      vi.stubGlobal('fetch', fetch);
+      expect((await message(complete)).ok).toBe(true);
+      expect(new URLSearchParams(fetch.mock.calls[1][1].body).has('finish_date')).toBe(false);
+    },
+  );
+  it('does not set dates during ordinary episode updates even when enabled', async () => {
+    await mock.browser.storage.local.set({
+      settings: { ...(await getSettings()), autoFinishDate: true },
+      pending: [finale()],
+    });
+    const entry = {
+      ...finished,
+      my_list_status: { ...finished.my_list_status!, num_episodes_watched: 11 },
+    };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(json(entry))
+      .mockResolvedValueOnce(json(finished.my_list_status));
+    vi.stubGlobal('fetch', fetch);
+    expect((await message({ type: 'APPROVE_UPDATE', id: '5:1:12' })).ok).toBe(true);
+    expect(fetch.mock.calls[1][1].body).toBe('num_watched_episodes=12');
+  });
+  it.each([true, false])(
+    'verifies the saved date if the update response omits it (confirmed: %s)',
+    async (confirmed) => {
+      await mock.browser.storage.local.set({
+        settings: { ...(await getSettings()), autoFinishDate: true },
+      });
+      const status = {
+        ...finished.my_list_status!,
+        status: 'completed',
+        ...(confirmed ? { finish_date: localDate() } : {}),
+      };
+      const fetch = vi
+        .fn()
+        .mockResolvedValueOnce(json(finished))
+        .mockResolvedValueOnce(json({ ...finished.my_list_status, status: 'completed' }))
+        .mockResolvedValueOnce(json({ ...finished, my_list_status: status }));
+      vi.stubGlobal('fetch', fetch);
+      const reply = await message(complete);
+      expect(reply.ok).toBe(confirmed);
+      if (!reply.ok) expect(reply.error).toContain('did not confirm its finish date');
+      expect(fetch).toHaveBeenCalledTimes(3);
+    },
+  );
+  it('persists a boolean finish-date preference and rejects other values', async () => {
+    expect((await getSettings()).autoFinishDate).toBe(false);
+    const settings = { ...(await getSettings()), autoFinishDate: true };
+    expect(
+      (await message({ type: 'SAVE_SETTINGS', settings: { ...settings, autoFinishDate: 'true' } }))
+        .ok,
+    ).toBe(false);
+    expect((await getSettings()).autoFinishDate).toBe(false);
+    expect((await message({ type: 'SAVE_SETTINGS', settings })).ok).toBe(true);
+    expect((await getSettings()).autoFinishDate).toBe(true);
   });
   it('leaves a finale queued if saving completion fails', async () => {
     await mock.browser.storage.local.set({ pending: [finale()] });

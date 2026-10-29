@@ -3,6 +3,7 @@ import { accumulate, addRange, emptyProgress, isComplete } from '../src/shared/p
 import type { Playback, Settings } from '../src/shared/types';
 const settings: Settings = {
   autoProgress: false,
+  autoFinishDate: false,
   threshold: 90,
   minWatchSeconds: 60,
   showPrompts: true,

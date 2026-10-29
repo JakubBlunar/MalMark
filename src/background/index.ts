@@ -13,6 +13,7 @@ import { automaticMatch, titleForSeason } from '../shared/matching';
 import { accumulate, emptyProgress, isComplete } from '../shared/progress';
 import { cancelLogin, connect, getAnime, searchAnime, updateAnime } from './mal';
 import { progressUpdateValues } from '../shared/list-status';
+import { localDate } from '../shared/completion';
 import {
   getAuth,
   getLoginClientId,
@@ -507,7 +508,8 @@ async function uiMessage(message: Message): Promise<unknown> {
         s.minWatchSeconds > 600 ||
         typeof s.showPrompts !== 'boolean' ||
         typeof s.promptAtEnd !== 'boolean' ||
-        (s.autoProgress !== undefined && typeof s.autoProgress !== 'boolean')
+        (s.autoProgress !== undefined && typeof s.autoProgress !== 'boolean') ||
+        (s.autoFinishDate !== undefined && typeof s.autoFinishDate !== 'boolean')
       )
         throw new Error(
           'Check the settings. Completion must be 50–100%, with 30–600 minimum seconds.',
@@ -515,6 +517,7 @@ async function uiMessage(message: Message): Promise<unknown> {
       await browser.storage.local.set({
         settings: {
           autoProgress: s.autoProgress ?? false,
+          autoFinishDate: s.autoFinishDate ?? false,
           threshold: s.threshold,
           minWatchSeconds: s.minWatchSeconds,
           showPrompts: s.showPrompts,
@@ -724,15 +727,29 @@ async function uiMessage(message: Message): Promise<unknown> {
       const watched = anime.my_list_status.num_episodes_watched;
       if (watched < anime.num_episodes && !pending)
         throw new Error('Log all episodes before marking this anime completed.');
+      const finishDate =
+        (await getSettings()).autoFinishDate && !anime.my_list_status.finish_date
+          ? localDate()
+          : undefined;
       anime.my_list_status = await updateAnime(anime.id, {
         status: 'completed',
         num_watched_episodes: Math.max(watched, anime.num_episodes),
         ...(message.score === undefined ? {} : { score: message.score }),
+        ...(finishDate ? { finish_date: finishDate } : {}),
       });
       await refreshAnimeSessions(anime);
       for (const item of await getPending())
         if (item.anime.id === anime.id && item.episode <= anime.my_list_status.num_episodes_watched)
           await resolvePending(item);
+      if (finishDate && anime.my_list_status.finish_date !== finishDate) {
+        const saved = await getAnime(anime.id);
+        await refreshAnimeSessions(saved);
+        if (saved.my_list_status?.finish_date !== finishDate)
+          throw new Error(
+            'The anime was marked completed, but MyAnimeList did not confirm its finish date. Check the date on MyAnimeList.',
+          );
+        return saved;
+      }
       return anime;
     }
     case 'APPROVE_UPDATE': {

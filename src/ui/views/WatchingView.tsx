@@ -41,7 +41,13 @@ export function WatchingView({
       ) : (
         <>
           {state.pending.map((item) => (
-            <PendingUpdateCard key={item.id} item={item} busy={busy} act={act} />
+            <PendingUpdateCard
+              key={item.id}
+              item={item}
+              busy={busy}
+              act={act}
+              autoFinishDate={state.settings.autoFinishDate}
+            />
           ))}
           {s ? (
             <>

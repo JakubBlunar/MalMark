@@ -120,6 +120,7 @@ test('built Chromium extension detects a supported page and serves its popup', a
     );
     expect(saved).toEqual({
       autoProgress: false,
+      autoFinishDate: false,
       threshold: 85,
       minWatchSeconds: 60,
       showPrompts: true,

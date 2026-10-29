@@ -77,6 +77,22 @@ export function PreferencesForm({
           />
           <i className="toggle" />
         </label>
+        <label className="toggle-row" htmlFor="auto-finish-date">
+          <span>
+            <b>Set finish date automatically</b>
+            <small>
+              Use today’s local date when you mark an anime Completed. Existing finish dates stay
+              unchanged.
+            </small>
+          </span>
+          <input
+            id="auto-finish-date"
+            type="checkbox"
+            checked={draft.autoFinishDate}
+            onChange={(e) => change('autoFinishDate', e.target.checked)}
+          />
+          <i className="toggle" />
+        </label>
         <label htmlFor="threshold" className="range-label">
           Completion threshold <b>{draft.threshold}%</b>
         </label>

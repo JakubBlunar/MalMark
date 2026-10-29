@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { CheckCheck, Star } from 'lucide-react';
 import type { Anime, PendingUpdate } from '../../../shared/types';
-import { canCompleteAnime } from '../../../shared/completion';
+import { canCompleteAnime, localDate } from '../../../shared/completion';
 import type { Act } from '../../types';
 import { Spinner } from '../shared/Spinner';
 
@@ -10,6 +10,7 @@ interface CompletionProps {
   pending?: PendingUpdate;
   busy: string;
   act: Act;
+  autoFinishDate: boolean;
 }
 
 export function CompleteAnimeControl(props: CompletionProps) {
@@ -22,7 +23,7 @@ export function CompleteAnimeControl(props: CompletionProps) {
   return <CompletionForm key={`${anime.id}:${anime.num_episodes}`} {...props} />;
 }
 
-function CompletionForm({ anime, pending, busy, act }: CompletionProps) {
+function CompletionForm({ anime, pending, busy, act, autoFinishDate }: CompletionProps) {
   const [editing, setEditing] = useState(false);
   const [score, setScore] = useState('');
   const scoreId = useId();
@@ -55,6 +56,13 @@ function CompletionForm({ anime, pending, busy, act }: CompletionProps) {
               ? `Log all ${anime.num_episodes} episodes and move this anime to Completed.`
               : 'Move this anime to Completed.'}{' '}
             Your score is optional.
+          </p>
+          <p className="helper">
+            {anime.my_list_status?.finish_date
+              ? `Keeps your finish date: ${anime.my_list_status.finish_date}.`
+              : autoFinishDate
+                ? `Finish date will be set to today (${localDate()}).`
+                : 'Finish date stays blank. Enable automatic finish dates in Settings to fill it in.'}
           </p>
           <label htmlFor={scoreId}>Your score</label>
           <select

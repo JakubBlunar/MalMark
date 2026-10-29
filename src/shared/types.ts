@@ -22,6 +22,7 @@ export interface ListStatus {
   num_episodes_watched: number;
   score?: number;
   is_rewatching?: boolean;
+  finish_date?: string | null;
 }
 
 export interface Anime {
@@ -52,6 +53,7 @@ export interface Profile {
 
 export interface Settings {
   autoProgress: boolean;
+  autoFinishDate: boolean;
   threshold: number;
   minWatchSeconds: number;
   showPrompts: boolean;

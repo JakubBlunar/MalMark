@@ -13,6 +13,7 @@ A browser extension for Chrome, Brave and Firefox that detects the anime you’r
 - Opt into automatic progress for exactly the next episode after the saved count, or episode 1 of a new title, with a four-second success notice. Completed and Dropped retain their status. Gaps, On Hold and failed updates stay queued for confirmation; completion and scores remain manual.
 - Rewatching a fully logged title leaves its MAL episode total untouched. Manually saving a lower count resets later playback checkpoints and reminders so tracking can continue from that count. MAL's explicit rewatch mode remains managed on MyAnimeList.
 - Complete and optionally score finished-airing anime after the final episode.
+- Enable **Set finish date automatically** in Settings to fill a missing MAL finish date with your local calendar date when marking an anime Completed. Existing dates are preserved; ordinary episode logging does not change dates.
 - A selector picker for websites you choose to add, with permission per domain.
 
 GitHub downloads start with API setup: create a MyAnimeList app of type **Other**, register the exact redirect URL shown by Malmark, and paste its public client ID. Then sign in, open an episode, and confirm updates when ready. Use **Open sidebar** in the header to keep Malmark beside your video. The sidebar follows the active tab.

@@ -11,6 +11,7 @@ import type {
 
 export const defaults: Settings = {
   autoProgress: false,
+  autoFinishDate: false,
   threshold: 65,
   minWatchSeconds: 60,
   showPrompts: true,
@@ -22,6 +23,7 @@ export async function getSettings(): Promise<Settings> {
   // Ignore old per-user OAuth configuration without touching existing login tokens.
   return {
     autoProgress: settings?.autoProgress === true,
+    autoFinishDate: settings?.autoFinishDate === true,
     threshold: settings?.threshold ?? defaults.threshold,
     minWatchSeconds: settings?.minWatchSeconds ?? defaults.minWatchSeconds,
     showPrompts: settings?.showPrompts ?? defaults.showPrompts,

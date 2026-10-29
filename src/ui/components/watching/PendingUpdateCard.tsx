@@ -9,10 +9,12 @@ export function PendingUpdateCard({
   item,
   busy,
   act,
+  autoFinishDate,
 }: {
   item: PendingUpdate;
   busy: string;
   act: Act;
+  autoFinishDate: boolean;
 }) {
   return (
     <section className="card pending-card">
@@ -74,6 +76,7 @@ export function PendingUpdateCard({
         pending={item}
         busy={busy}
         act={act}
+        autoFinishDate={autoFinishDate}
       />
     </section>
   );

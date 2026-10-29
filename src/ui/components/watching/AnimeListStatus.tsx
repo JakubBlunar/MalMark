@@ -28,6 +28,9 @@ export function AnimeListStatus({
             {anime.my_list_status.score ? (
               <span>Your score: {anime.my_list_status.score}/10</span>
             ) : null}
+            {anime.my_list_status.finish_date && (
+              <span>Finished: {anime.my_list_status.finish_date}</span>
+            )}
           </div>
           <a
             className="icon-button"

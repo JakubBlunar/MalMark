@@ -46,10 +46,10 @@ test('completion and scoring require approval, fresh Finished Airing data, and a
         if (options.method === 'PATCH') {
           root.testWrites.push({ animeId: anime.id, body: options.body });
           const form = new URLSearchParams(options.body);
-          for (const key of ['status', 'score', 'num_watched_episodes']) {
+          for (const key of ['status', 'score', 'num_watched_episodes', 'finish_date']) {
             if (!form.has(key)) continue;
             anime.my_list_status[key === 'num_watched_episodes' ? 'num_episodes_watched' : key] =
-              key === 'status' ? form.get(key) : Number(form.get(key));
+              key === 'status' || key === 'finish_date' ? form.get(key) : Number(form.get(key));
           }
           return new Response(JSON.stringify(anime.my_list_status));
         }
@@ -123,6 +123,19 @@ test('completion and scoring require approval, fresh Finished Airing data, and a
       { animeId: 1, body: 'status=completed&num_watched_episodes=12&score=9' },
     ]);
 
+    await popup.getByRole('button', { name: 'Settings', exact: true }).click();
+    await popup.getByLabel('Set finish date automatically').check();
+    await popup.getByRole('button', { name: 'Save settings', exact: true }).click();
+    await expect(popup.getByRole('status')).toContainText('Settings saved.');
+    await popup.reload();
+    await popup.getByRole('button', { name: 'Settings', exact: true }).click();
+    await expect(popup.getByLabel('Set finish date automatically')).toBeChecked();
+    await popup.getByRole('button', { name: 'Watching', exact: true }).click();
+    const today = await popup.evaluate(() => {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    });
+
     // An autoplayed-away finale remains completable independently of the current anime.
     await worker.evaluate(async (tabId) => {
       const root = globalThis as any;
@@ -144,6 +157,7 @@ test('completion and scoring require approval, fresh Finished Airing data, and a
     await expect(pending.getByLabel('Your score').locator('option:checked')).toHaveText(
       'Keep current score (8/10)',
     );
+    await expect(pending.getByText(`Finish date will be set to today (${today}).`)).toBeVisible();
     await pending.getByRole('button', { name: 'Save completion' }).click();
     await expect(pending).toHaveCount(0);
     const result = await worker.evaluate(() => ({
@@ -152,9 +166,14 @@ test('completion and scoring require approval, fresh Finished Airing data, and a
     }));
     expect(result.writes[1]).toEqual({
       animeId: 2,
-      body: 'status=completed&num_watched_episodes=6',
+      body: `status=completed&num_watched_episodes=6&finish_date=${today}`,
     });
-    expect(result.status).toEqual({ status: 'completed', num_episodes_watched: 6, score: 8 });
+    expect(result.status).toEqual({
+      status: 'completed',
+      num_episodes_watched: 6,
+      score: 8,
+      finish_date: today,
+    });
     await expect(popup.getByText('Your score: 9/10', { exact: true })).toBeVisible();
   } finally {
     await context.close();
