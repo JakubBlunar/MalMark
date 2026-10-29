@@ -27,7 +27,8 @@ export function PrivacyCard({
         MyAnimeList to find a match. No analytics or third-party tracking services.
       </p>
       <p className="privacy-copy">
-        List changes always need your approval. Disconnecting removes your tokens and queued
+        List changes always need your approval. Partial episode progress stays for up to 30 days,
+        with at most 100 episodes saved. Disconnecting removes tokens, playback progress and queued
         updates; saved matches stay on this device.
       </p>
       <a className="text-button" href="./THIRD_PARTY_NOTICES.md" target="_blank" rel="noreferrer">

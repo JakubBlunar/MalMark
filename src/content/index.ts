@@ -3,35 +3,41 @@ import { detect } from './detect';
 import type { Message, PendingUpdate, Reply, SiteConfig } from '../shared/types';
 import { siteForUrl } from '../shared/sites';
 import { startPicker } from './picker';
+import { createPlayerTracker } from './player';
 
 declare global {
   interface Window {
-    __malmarkLoaded?: boolean;
+    __malmarkController?: { stop: () => void };
   }
 }
-if (!window.__malmarkLoaded) {
-  window.__malmarkLoaded = true;
-  start();
-}
-function start(): void {
+if (!window.__malmarkController) window.__malmarkController = start();
+function start(): { stop: () => void } | undefined {
   let valid = true;
-  async function send<T>(message: Message): Promise<T | undefined> {
+  async function sendReply<T>(message: Message): Promise<Reply<T> | undefined> {
     if (!valid) return;
     try {
       const reply = (await browser.runtime.sendMessage(message)) as Reply<T>;
-      return reply?.ok ? reply.data : undefined;
-    } catch {
-      valid = false;
+      return reply;
+    } catch (error) {
+      // Worker startup and a temporarily missing receiver are recoverable.
+      if (
+        /extension context invalidated/i.test(
+          error instanceof Error ? error.message : String(error),
+        )
+      )
+        stop();
     }
+  }
+  async function send<T>(message: Message): Promise<T | undefined> {
+    const reply = await sendReply<T>(message);
+    return reply?.ok ? reply.data : undefined;
   }
   const topPage = window === window.top;
   let customConfig: SiteConfig | undefined;
   let configReady = false;
-  const ids = new WeakMap<HTMLVideoElement, string>();
-  const bound = new WeakSet<HTMLVideoElement>();
-  let selected: HTMLVideoElement | undefined;
-  let lastSample = 0;
-  let lastVideoId = '';
+  let configLoading = false;
+  let scanPending = false;
+  let detectionAcknowledgedAt = 0;
   let lastUrl = location.href;
   let routeChangedAt = Date.now();
   let lastDetection = '';
@@ -136,7 +142,6 @@ function start(): void {
       routeChangedAt = Date.now();
       lastDetection = '';
       candidate = '';
-      lastSample = 0;
       host?.remove();
       host = undefined;
       await send({ type: 'DETECTION', detection: null, pageUrl: location.href, frameOrigins: [] });
@@ -152,91 +157,49 @@ function start(): void {
       return;
     }
     if (Date.now() - candidateAt < 800) return;
-    if (signature !== lastDetection || force) {
-      lastDetection = signature;
-      await send({ type: 'DETECTION', detection, pageUrl: location.href, frameOrigins });
-      await prompt();
+    if (
+      !scanPending &&
+      (signature !== lastDetection || force || Date.now() - detectionAcknowledgedAt >= 10000)
+    ) {
+      scanPending = true;
+      const pageUrl = location.href;
+      try {
+        const reply = await sendReply({ type: 'DETECTION', detection, pageUrl, frameOrigins });
+        if (reply?.ok && pageUrl === location.href) {
+          lastDetection = signature;
+          detectionAcknowledgedAt = Date.now();
+          players.scan(true);
+          await prompt();
+        }
+      } finally {
+        scanPending = false;
+      }
     }
   }
-  function sample(video: HTMLVideoElement, urgent = false): void {
-    if (!valid || !Number.isFinite(video.duration) || video.duration < 60) return;
-    // Avoid short ad clips and hidden preload videos; prefer the visible, playing video.
-    const box = video.getBoundingClientRect();
-    if (box.width < 180 || box.height < 100) return;
-    if (
-      selected &&
-      selected !== video &&
-      !selected.paused &&
-      !selected.ended &&
-      selected.isConnected
-    )
-      return;
-    selected = video;
-    const id = ids.get(video)!;
-    if (!urgent && id === lastVideoId && Date.now() - lastSample < 4000) return;
-    lastSample = Date.now();
-    lastVideoId = id;
+  const players = createPlayerTracker((playback) => {
+    if (!valid) return;
     if (topPage && (lastUrl !== location.href || !lastDetection)) return;
     void send({
       type: 'PLAYBACK',
       pageUrl: location.href,
-      playback: {
-        videoId: id,
-        currentTime: video.currentTime,
-        duration: video.duration,
-        paused: video.paused,
-        ended: video.ended,
-        rate: video.playbackRate,
-        sentAt: Date.now(),
-      },
+      playback,
     });
-  }
-  function scanVideos(): void {
-    for (const video of document.querySelectorAll('video')) {
-      if (!bound.has(video)) {
-        bound.add(video);
-        ids.set(video, crypto.randomUUID());
-        for (const event of [
-          'play',
-          'pause',
-          'ended',
-          'seeked',
-          'ratechange',
-          'loadedmetadata',
-          'emptied',
-        ])
-          video.addEventListener(event, () => {
-            if (event === 'emptied') ids.set(video, crypto.randomUUID());
-            sample(video, true);
-          });
-        video.addEventListener('timeupdate', () => sample(video));
-      }
-      if (!video.paused) sample(video);
-    }
-    // Some players use an open shadow root.
-    for (const el of document.querySelectorAll('cr-video, crunchyroll-player, media-player')) {
-      const video = el.shadowRoot?.querySelector('video');
-      if (video && !bound.has(video)) {
-        bound.add(video);
-        ids.set(video, crypto.randomUUID());
-        video.addEventListener('timeupdate', () => sample(video));
-        video.addEventListener('ended', () => sample(video, true));
-      }
-    }
-  }
-  browser.runtime.onMessage.addListener((message: unknown) => {
+  });
+  const listener = (message: unknown) => {
     if (!message || typeof message !== 'object' || !('type' in message)) return false;
+    if (message.type === 'PING_PLAYER') return Promise.resolve({ ready: valid });
     if (message.type === 'REDETECT') {
       lastDetection = '';
       void scanPage(true);
+      players.scan(true);
     }
     if (message.type === 'PROMPT_CHANGED') void prompt();
-    if (message.type === 'SITE_CONFIG_CHANGED')
-      void send<SiteConfig>({ type: 'GET_SITE_CONFIG' }).then((config) => {
-        customConfig = config;
-        lastDetection = '';
-        candidate = '';
-      });
+    if (message.type === 'SITE_CONFIG_CHANGED') {
+      configReady = false;
+      lastDetection = '';
+      candidate = '';
+      void loadConfig();
+    }
     if (
       message.type === 'START_PICKER' &&
       topPage &&
@@ -263,22 +226,55 @@ function start(): void {
       });
     }
     return false;
+  };
+  browser.runtime.onMessage.addListener(listener);
+  const events = new AbortController();
+  document.addEventListener('fullscreenchange', () => void prompt(), { signal: events.signal });
+  window.addEventListener(
+    'pageshow',
+    () => {
+      detectionAcknowledgedAt = 0;
+      players.scan(true);
+    },
+    { signal: events.signal },
+  );
+  document.addEventListener('visibilitychange', () => players.scan(true), {
+    signal: events.signal,
   });
-  document.addEventListener('fullscreenchange', () => void prompt());
   const timer = window.setInterval(() => {
-    if (!valid) {
-      clearInterval(timer);
-      host?.remove();
-      return;
-    }
+    if (!configReady) void loadConfig();
     void scanPage();
-    scanVideos();
+    players.scan();
     placePrompt();
   }, 1200);
-  void send<SiteConfig>({ type: 'GET_SITE_CONFIG' }).then((config) => {
-    customConfig = config;
-    configReady = true;
-    void scanPage();
-  });
-  scanVideos();
+  async function loadConfig() {
+    if (configLoading || !valid) return;
+    configLoading = true;
+    try {
+      const reply = await sendReply<SiteConfig>({ type: 'GET_SITE_CONFIG' });
+      if (reply?.ok) {
+        customConfig = reply.data;
+        configReady = true;
+        void scanPage();
+      }
+    } finally {
+      configLoading = false;
+    }
+  }
+  function stop() {
+    valid = false;
+    clearInterval(timer);
+    players.stop();
+    events.abort();
+    host?.remove();
+    if (window.__malmarkController?.stop === stop) delete window.__malmarkController;
+    try {
+      browser.runtime.onMessage.removeListener(listener);
+    } catch {
+      /* invalidated extension */
+    }
+  }
+  void loadConfig();
+  players.scan();
+  return valid ? { stop } : undefined;
 }

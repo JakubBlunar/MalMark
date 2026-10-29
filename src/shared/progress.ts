@@ -48,7 +48,7 @@ export function accumulate(
   let ranges = progress.ranges;
   const sameVideo = previous?.videoId === sample.videoId && progress.frameId === frameId;
   const sameDuration = Math.abs(progress.duration - sample.duration) < 3;
-  if ((!sameDuration && progress.duration > 0) || frameChanged) ranges = [];
+  if (!sameDuration && progress.duration > 0) ranges = [];
   if (previous && sameVideo && sameDuration && !previous.paused) {
     const elapsed = (sample.sentAt - previous.sentAt) / 1000;
     const advance = sample.currentTime - previous.currentTime;

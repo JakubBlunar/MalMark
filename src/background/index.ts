@@ -26,6 +26,14 @@ import {
 import { configForUrl, registerSite, retireLegacyAccess, supportedUrl } from './sites';
 import { chromiumSidePanel } from '../shared/sidebar';
 import { OAUTH_SETUP_REQUIRED } from '../shared/config';
+import {
+  clearWatchedProgress,
+  discardWatchProgress,
+  pruneWatchHistory,
+  removeSiteProgress,
+  restoreWatchProgress,
+  saveWatchProgress,
+} from './watch-history';
 
 const errorText = (error: unknown): string =>
   error instanceof Error ? error.message : 'Something went wrong. Please try again.';
@@ -106,6 +114,19 @@ async function resolve(d: Detection, previous?: WatchSession): Promise<WatchSess
     }
     if (session.episodeOverride) session.episode = session.episodeOverride;
     session.match = session.anime ? 'matched' : 'unmatched';
+    if (
+      !sameEpisode ||
+      previous?.anime?.id !== session.anime?.id ||
+      previous?.episode !== session.episode
+    ) {
+      session.progress = await restoreWatchProgress(session);
+      session.playerConnected = false;
+    }
+    if (session.anime?.my_list_status)
+      await clearWatchedProgress(
+        session.anime.id,
+        session.anime.my_list_status.num_episodes_watched,
+      );
   } catch (e) {
     session.error = errorText(e);
   }
@@ -218,9 +239,12 @@ async function playbackMessage(
     typeof p.ended !== 'boolean'
   )
     return;
-  session.progress = accumulate(session.progress, { ...p, sentAt: Date.now() }, sender.frameId);
-  session.playerConnected = session.progress.duration > 0;
+  const progress = accumulate(session.progress, { ...p, sentAt: Date.now() }, sender.frameId);
+  if (progress === session.progress) return;
+  session.progress = progress;
+  session.playerConnected = true;
   session.updatedAt = Date.now();
+  await saveWatchProgress(session);
   await setSession(tabId, session);
   await completed(tabId, session);
 }
@@ -230,9 +254,8 @@ async function injectPlayers(tabId: number): Promise<void> {
   if (!tab.url || !(await supportedUrl(tab.url))) return;
   const frames = await browser.webNavigation.getAllFrames({ tabId });
   await Promise.allSettled(
-    (frames ?? [])
-      .filter((f) => f.frameId !== 0)
-      .map(async (frame) => {
+    [{ frameId: 0, url: tab.url }, ...(frames ?? []).filter((f) => f.frameId !== 0)].map(
+      async (frame) => {
         let origin: string;
         try {
           const u = new URL(frame.url);
@@ -242,12 +265,17 @@ async function injectPlayers(tabId: number): Promise<void> {
           return;
         }
         if (await browser.permissions.contains({ origins: [origin + '/*'] })) {
+          const health = (await browser.tabs
+            .sendMessage(tabId, { type: 'PING_PLAYER' }, { frameId: frame.frameId })
+            .catch(() => undefined)) as { ready?: boolean } | undefined;
+          if (health?.ready) return;
           await browser.scripting.executeScript({
             target: { tabId, frameIds: [frame.frameId] },
             files: ['content.js'],
           });
         }
-      }),
+      },
+    ),
   );
 }
 
@@ -263,6 +291,13 @@ async function snapshot(tabId?: number): Promise<PublicState> {
   ]);
   const tab =
     tabId === undefined ? undefined : await browser.tabs.get(tabId).catch(() => undefined);
+  const session =
+    tabId !== undefined && tab?.url && (await supportedUrl(tab.url))
+      ? await getSession(tabId)
+      : undefined;
+  if (session)
+    session.playerConnected =
+      !!session.progress.last && Date.now() - session.progress.last.sentAt < 15000;
   return {
     settings,
     oauth: { mode: OAUTH_SETUP_REQUIRED ? 'unpacked' : 'store', clientId },
@@ -270,10 +305,7 @@ async function snapshot(tabId?: number): Promise<PublicState> {
     connected: !!auth,
     redirectUrl: browser.identity.getRedirectURL(),
     tabId,
-    session:
-      tabId !== undefined && tab?.url && (await supportedUrl(tab.url))
-        ? await getSession(tabId)
-        : undefined,
+    session,
     pending: auth ? pending : [],
     mappings,
     playerPermissions: (permissions.origins ?? []).filter(
@@ -306,6 +338,7 @@ async function recheck(tabId: number): Promise<void> {
   await browser.tabs
     .sendMessage(tabId, { type: 'REDETECT' }, { frameId: 0 })
     .catch(() => undefined);
+  await injectPlayers(tabId);
 }
 
 async function resolvePending(item: PendingUpdate): Promise<void> {
@@ -324,6 +357,8 @@ async function resolvePending(item: PendingUpdate): Promise<void> {
 }
 
 async function refreshAnimeSessions(anime: Anime): Promise<void> {
+  if (anime.my_list_status)
+    await clearWatchedProgress(anime.id, anime.my_list_status.num_episodes_watched);
   const entries = await browser.storage.session.get(null);
   for (const [key, value] of Object.entries(entries)) {
     const session = value as WatchSession;
@@ -379,7 +414,7 @@ async function uiMessage(message: Message): Promise<unknown> {
     }
     case 'LOGOUT': {
       cancelLogin();
-      await browser.storage.local.remove(['auth', 'pending', 'resolved']);
+      await browser.storage.local.remove(['auth', 'pending', 'resolved', 'watchHistory']);
       await browser.storage.session.clear();
       for (const tab of await browser.tabs.query({}))
         if (tab.id !== undefined && tab.url && (await supportedUrl(tab.url))) await badge(tab.id);
@@ -425,7 +460,10 @@ async function uiMessage(message: Message): Promise<unknown> {
         ],
       });
       // A changed anime mapping invalidates playback credit and queued suggestions for this page.
+      await discardWatchProgress(session);
       const fresh = await resolve(session.detection);
+      await discardWatchProgress(fresh);
+      fresh.progress = emptyProgress();
       fresh.frameOrigins = session.frameOrigins;
       await setSession(message.tabId, fresh);
       await browser.storage.local.set({
@@ -456,9 +494,11 @@ async function uiMessage(message: Message): Promise<unknown> {
       )
         throw new Error('Enter a valid MAL episode number.');
       const previousEpisode = session.episode;
+      await discardWatchProgress(session);
       session.episode = message.episode;
       session.episodeOverride = message.episode;
       session.progress = emptyProgress();
+      await discardWatchProgress(session);
       await browser.storage.local.set({
         pending: (await getPending()).filter(
           (p) =>
@@ -575,6 +615,7 @@ async function uiMessage(message: Message): Promise<unknown> {
       const sites = await getSites();
       const site = sites.find((s) => s.id === message.id);
       if (!site) return;
+      await removeSiteProgress(site.origin);
       await browser.scripting.unregisterContentScripts({ ids: ['custom-' + site.id] });
       await browser.storage.local.set({ sites: sites.filter((s) => s.id !== site.id) });
       if (!siteForUrl(site.origin))
@@ -749,6 +790,7 @@ browser.runtime.onInstalled.addListener(async () => {
   };
   await local.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' });
   await serialized(async () => {
+    await pruneWatchHistory();
     await retireLegacyAccess().catch(() => undefined);
     const entries = await browser.storage.session.get(null);
     for (const [key, value] of Object.entries(entries)) {
@@ -760,4 +802,11 @@ browser.runtime.onInstalled.addListener(async () => {
     }
   });
   await Promise.allSettled((await getSites()).map(registerSite));
+  await Promise.allSettled(
+    (await browser.tabs.query({})).flatMap((tab) =>
+      tab.id === undefined ? [] : [injectPlayers(tab.id)],
+    ),
+  );
 });
+
+browser.runtime.onStartup.addListener(() => serialized(pruneWatchHistory));

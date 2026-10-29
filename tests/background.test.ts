@@ -36,6 +36,7 @@ const mock = vi.hoisted(() => {
       getURL: (p: string) => `moz-extension://test/${p}`,
       onMessage: { addListener: vi.fn() },
       onInstalled: { addListener: vi.fn() },
+      onStartup: { addListener: vi.fn() },
     },
     tabs: {
       get: vi.fn(async () => ({ id: 1, url: 'https://www.crunchyroll.com/watch/show?ep=1' })),
@@ -87,6 +88,7 @@ vi.mock('../src/shared/config', () => ({
 }));
 import '../src/background/index';
 import { getSettings } from '../src/background/storage';
+import { saveWatchProgress } from '../src/background/watch-history';
 import { retireLegacyAccess, supportedUrl } from '../src/background/sites';
 import {
   authorizationCode,
@@ -449,6 +451,58 @@ describe('OAuth and MAL transport', () => {
   });
 });
 describe('background consent boundary', () => {
+  it('restores a checkpoint through detection after all tab sessions are lost', async () => {
+    const previous = session();
+    previous.progress = { ranges: [[0, 100]], watched: 100, position: 100, duration: 1000 };
+    await saveWatchProgress(previous);
+    await mock.browser.storage.session.clear();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async () => json({ data: [{ node: anime }], ...anime })),
+    );
+    expect(
+      (
+        await message(
+          { type: 'DETECTION', detection, pageUrl: detection.url, frameOrigins: [] },
+          content,
+        )
+      ).ok,
+    ).toBe(true);
+    const restored = mock.getSession()['tab:1'] as WatchSession;
+    expect(restored.progress.watched).toBe(100);
+    expect(restored.progress.last).toBeUndefined();
+    expect(restored.playerConnected).toBe(false);
+    expect((await message({ type: 'LOGOUT' })).ok).toBe(true);
+    expect(mock.getLocal().watchHistory).toBeUndefined();
+  });
+  it('shows a stale player as disconnected and retries injection on recheck', async () => {
+    const previous = session();
+    previous.playerConnected = true;
+    previous.progress = {
+      ...previous.progress,
+      duration: 1000,
+      last: {
+        videoId: 'stale',
+        currentTime: 10,
+        duration: 1000,
+        sentAt: Date.now() - 20000,
+        paused: false,
+        ended: false,
+        rate: 1,
+      },
+    };
+    await mock.browser.storage.session.set({ 'tab:1': previous });
+    const reply = await message<{ session: WatchSession }>({ type: 'GET_STATE', tabId: 1 });
+    expect(reply.ok && reply.data.session.playerConnected).toBe(false);
+    mock.browser.permissions.contains.mockResolvedValue(true);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(anime)));
+    mock.browser.scripting.executeScript.mockClear();
+    await message({ type: 'RECHECK', tabId: 1 });
+    expect(mock.browser.scripting.executeScript).toHaveBeenCalledWith({
+      target: { tabId: 1, frameIds: [0] },
+      files: ['content.js'],
+    });
+  });
   it('allows the sidebar to use the same trusted account and progress controls', async () => {
     const response = await message<{ connected: boolean }>(
       { type: 'GET_STATE', tabId: 1 },

@@ -67,11 +67,17 @@ describe('watched time tracking', () => {
     expect(p.frameId).toBe(0);
     expect(p.watched).toBe(0);
   });
-  it('can replace a frame that stopped reporting, without reusing its credit', () => {
+  it('retains watched ranges when a replacement frame resumes the same episode', () => {
     let p = accumulate(accumulate(emptyProgress(), sample(0, 0), 0), sample(5, 5000), 0);
     p = accumulate(p, sample(20, 25000), 2);
     expect(p.frameId).toBe(2);
-    expect(p.watched).toBe(0);
+    expect(p.watched).toBe(5);
+    p = accumulate(p, sample(25, 30000), 2);
+    expect(p.ranges).toEqual([
+      [0, 5],
+      [20, 25],
+    ]);
+    expect(p.watched).toBe(10);
   });
   it('allows a replacement player without crediting its jump', () => {
     const p = accumulate(

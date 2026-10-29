@@ -5,6 +5,7 @@ A browser extension for Chrome, Brave and Firefox that detects the anime you’r
 - Crunchyroll support built in, with manual matching and episode offsets.
 - A persistent sidebar, popup, profile, and watch settings.
 - Playback tracking that accounts for speed changes and skipped scenes.
+- Partial episode progress survives browser restarts; old checkpoints expire after 30 days (100 episodes maximum).
 - Manual watched-count controls and reminders that survive autoplay.
 - A selector picker for websites you choose to add, with permission per domain.
 

@@ -1,6 +1,6 @@
 # Malmark privacy
 
-Malmark stores OAuth credentials, profile information, preferences, per-domain CSS selectors, MAL matching rules and pending episode updates in the browser’s extension storage. Credentials are not synced to another browser or device. Active playback sessions use session storage. Pending updates expire after seven days.
+Malmark stores OAuth credentials, profile information, preferences, per-domain CSS selectors, MAL matching rules and pending episode updates in the browser’s extension storage. Credentials are not synced to another browser or device. Active tabs use session storage. Watched timeline ranges for matched episodes are saved locally per MAL account, website, series and episode so progress survives closing the browser. These checkpoints expire after 30 days of inactivity, retain at most 100 episodes and are removed when MAL progress covers them or their custom website is removed. Pending updates expire after seven days.
 
 Connecting sends authentication requests to MyAnimeList. Detecting an anime sends its title to the official MAL API to search for a match. Manual searches, profile/detail requests and approved list updates also go to MAL. Cover/profile images are loaded from URLs returned by MAL. There is no analytics service or Malmark backend.
 
@@ -10,4 +10,4 @@ Built-in access is limited to Crunchyroll and MAL. Crunchyroll is the only built
 
 Only extension UI pages can approve a MAL list change. The content scripts read selected title/episode elements and accessible HTML5 playback state; they never receive OAuth tokens. The in-page prompt opens the extension review UI. A website setup session can save selectors only for its original tab and origin with a short-lived setup nonce.
 
-Use **Disconnect account** to remove stored credentials, session data and queued updates. Your public client ID, saved matches and website configurations remain available locally; edit the client ID from the sign-in screen, and remove matches and websites under **Matches** and **Sites**. Player permissions can be removed in **Settings**. Uninstalling Malmark removes its extension storage. Reload already-open pages after removing a site or player permission to unload injected scripts.
+Use **Disconnect account** to remove stored credentials, playback checkpoints, session data and queued updates. Your public client ID, saved matches and website configurations remain available locally; edit the client ID from the sign-in screen, and remove matches and websites under **Matches** and **Sites**. Player permissions can be removed in **Settings**. Uninstalling Malmark removes its extension storage. Reload already-open pages after removing a site or player permission to unload injected scripts.
