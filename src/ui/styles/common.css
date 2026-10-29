@@ -1,7 +1,7 @@
 .section-heading {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
   margin-bottom: 14px;
   gap: 8px;
 }
@@ -21,13 +21,16 @@
   color: var(--mint);
 }
 .quiet-tag {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+  display: inline-block;
+  line-height: 1;
   color: #8e95a7;
   font-size: 12px;
 }
 .quiet-tag i {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 5px;
+  transform: translateY(-1px);
   width: 5px;
   height: 5px;
   background: #7d8394;
