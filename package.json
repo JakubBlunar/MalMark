@@ -1,0 +1,48 @@
+{
+  "name": "malmark",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Elastic-2.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "type": "module",
+  "description": "A MyAnimeList episode tracker for Crunchyroll, with optional website setup.",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && node scripts/build.mjs",
+    "build:store": "tsc --noEmit && node scripts/build.mjs --store",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "format": "prettier --write src tests scripts .github *.json *.ts *.html *.md",
+    "format:check": "prettier --check src tests scripts .github *.json *.ts *.html *.md",
+    "package": "npm run build && node scripts/package.mjs",
+    "package:store": "npm run build:store && node scripts/package.mjs",
+    "lint:firefox": "web-ext lint --source-dir dist/firefox --no-config-discovery"
+  },
+  "dependencies": {
+    "lucide-react": "1.63.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "webextension-polyfill": "0.12.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/webextension-polyfill": "0.12.6",
+    "@vitejs/plugin-react": "6.1.2",
+    "esbuild": "0.28.2",
+    "fflate": "0.8.3",
+    "jsdom": "29.1.1",
+    "prettier": "3.9.10",
+    "sharp": "0.35.5",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "web-ext": "10.8.0"
+  }
+}

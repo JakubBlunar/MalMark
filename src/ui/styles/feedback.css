@@ -1,0 +1,99 @@
+.notice {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  border: 1px solid #5c3c4c;
+  background: #30202b;
+  color: #ecb0b9;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 17px;
+  font-size: 11px;
+}
+.notice svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.notice > span {
+  flex: 1;
+}
+.notice > button {
+  display: flex;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+}
+.notice.success {
+  background: #1b3028;
+  border-color: #31503e;
+  color: #afd9bf;
+}
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 320px;
+  color: #9d96b1;
+  font-size: 12px;
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.compact-form {
+  padding: 18px;
+}
+.compact-form label {
+  margin-top: 0;
+  font-size: 11px;
+}
+.compact-form .button {
+  padding: 10px;
+  font-size: 11px;
+}
+.compact-form input {
+  width: 80px;
+}
+.preview-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: #bca8df;
+  border: 1px dashed #43334f;
+  padding: 8px 10px;
+  border-radius: 7px;
+  margin-bottom: 20px;
+}
+.preview-banner > span {
+  font-size: 8px;
+  color: #777188;
+  letter-spacing: 0;
+}
+footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 24px;
+  border-top: 1px solid #232630;
+  font-size: 9px;
+  color: #646c83;
+}
+footer > span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.footer-dot {
+  width: 4px;
+  height: 4px;
+  background: #71648e;
+  border-radius: 50%;
+}

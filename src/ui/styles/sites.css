@@ -1,0 +1,115 @@
+.site-setup-card {
+  padding: 22px;
+}
+.site-setup-card > h2 {
+  margin: 15px 0 9px;
+  font-size: 20px;
+}
+.site-setup-card > p {
+  font-size: 11px;
+  line-height: 1.8;
+}
+.site-setup-card .setup-steps {
+  margin-top: 22px;
+}
+.setup-illustration {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  background: radial-gradient(ellipse, #68548b22, transparent);
+  height: 100px;
+  color: var(--accent);
+}
+.setup-illustration > div {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  transform: rotate(-3deg);
+}
+.setup-illustration span {
+  font-size: 12px;
+  border: 1px dashed #9f89d3;
+  padding: 5px 10px;
+  background: #2e263c;
+  border-radius: 4px;
+}
+.setup-illustration span.fake-episode {
+  font-size: 10px;
+  align-self: flex-start;
+  color: #9fceba;
+  border-color: #628e7d;
+  background: #23352e;
+}
+.setup-illustration > svg:last-child {
+  color: var(--mint);
+}
+.current-domain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #c0b3de;
+  margin: 20px 0 13px;
+  background: #12151d;
+  border-radius: 7px;
+  padding: 10px;
+}
+.current-domain span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.builtin-sites > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 18px;
+}
+.builtin-sites > div + div {
+  border-top: 1px solid var(--border);
+}
+.builtin-sites b {
+  font-size: 12px;
+  font-weight: 500;
+}
+.builtin-sites small {
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: #7b849b;
+  margin-left: auto;
+}
+.custom-site {
+  padding: 17px 18px;
+}
+.custom-site-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #b6a8d8;
+}
+.custom-site-heading > b {
+  font-size: 12px;
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.custom-site summary {
+  font-size: 10px;
+  color: #939bb0;
+  cursor: pointer;
+  margin-top: 14px;
+}
+.custom-site label {
+  font-size: 10px;
+  margin-top: 12px;
+}
+.custom-site code {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  background: #12151d;
+  border-radius: 6px;
+  padding: 9px;
+  color: #b5a8ce;
+}

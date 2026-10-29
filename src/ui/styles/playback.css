@@ -1,0 +1,153 @@
+.watch-progress {
+  padding: 20px 18px;
+}
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.progress-label > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #b9bed1;
+}
+.progress-label svg {
+  color: var(--accent);
+}
+.progress-label > b {
+  font-size: 11px;
+  font-weight: 500;
+  color: #c4b7f1;
+}
+.progress-track {
+  height: 5px;
+  border-radius: 10px;
+  background: #313240;
+  margin: 12px 0 9px;
+  position: relative;
+}
+.progress-track > span {
+  height: 100%;
+  display: block;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #8977cd, #c0afff);
+  transition: width 0.3s;
+}
+.progress-track > i {
+  position: absolute;
+  height: 9px;
+  width: 2px;
+  background: #878198;
+  top: -2px;
+}
+.progress-caption {
+  display: flex;
+  justify-content: space-between;
+  color: #717b91;
+  font-size: 9px;
+}
+.list-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 18px;
+  background: #151821;
+  border-top: 1px solid #292d39;
+}
+.list-status > svg {
+  color: #9691b9;
+}
+.list-status > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.list-status b {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+.list-status span {
+  font-size: 9px;
+  color: #7e889e;
+}
+.list-status .icon-button {
+  margin-left: auto;
+}
+.watched-control {
+  border-top: 1px solid var(--border);
+  padding: 14px 18px 16px;
+  background: #151821;
+}
+.watched-heading,
+.watched-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.watched-heading {
+  margin-bottom: 9px;
+}
+.watched-heading label {
+  margin: 0;
+  font-size: 11px;
+}
+.watched-heading .text-button {
+  font-size: 10px;
+}
+.count-stepper {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid #3a3a4e;
+  border-radius: 8px;
+  background: #10131c;
+}
+.count-stepper button {
+  border: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  padding: 0;
+  color: var(--accent);
+}
+.count-stepper input {
+  width: 53px;
+  text-align: center;
+  padding: 8px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  appearance: textfield;
+}
+.count-stepper input::-webkit-inner-spin-button {
+  appearance: none;
+}
+.watched-actions > .button {
+  padding: 9px 12px;
+  font-size: 11px;
+}
+.watched-control .helper {
+  margin-top: 9px;
+}
+.watch-tools {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 3px;
+  margin-top: -2px;
+  margin-bottom: 20px;
+}
+.subtle-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #717b91;
+  font-size: 10px;
+}
+.subtle-note svg {
+  color: #8a819f;
+}

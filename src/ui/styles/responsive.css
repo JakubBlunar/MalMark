@@ -1,0 +1,42 @@
+.navigation > button {
+  padding-left: 6px;
+  padding-right: 6px;
+  gap: 5px;
+  font-size: 11px;
+}
+@media (max-width: 400px) {
+  .full-page .navigation > button {
+    padding: 9px 4px;
+    gap: 5px;
+    font-size: 10px;
+    min-width: 0;
+  }
+  .full-page .navigation > button > svg {
+    width: 13px;
+    height: 13px;
+  }
+  .full-page .navigation {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+  .full-page .onboarding {
+    padding: 24px;
+  }
+  .full-page .how-it-works {
+    padding: 0 4px;
+  }
+}
+.onboarding > p.sign-in-note {
+  font-size: 10px;
+  line-height: 1.6;
+  text-align: center;
+  color: var(--muted);
+  margin: 12px 0 0;
+}
+.full-page .app-layout.signed-out {
+  display: block;
+}
+.full-page .app-layout.signed-out main {
+  max-width: 550px;
+  padding-top: 50px;
+}

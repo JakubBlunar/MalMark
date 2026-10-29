@@ -1,0 +1,16 @@
+node_modules/
+dist/
+artifacts/
+test-results/
+playwright-report/
+.env*
+!.env.example
+*.pem
+*.key
+*.log
+coverage/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+/THIRD_PARTY_NOTICES.md
