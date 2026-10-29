@@ -368,6 +368,8 @@ test('watched ranges survive closing the browser and resume without counting a s
     });
     await expect.poll(async () => (await session(worker, tabId))?.episode).toBe(3);
     expect((await session(worker, tabId)).progress.watched).toBe(0);
+    await sample(worker, tabId, 0);
+    await expect.poll(async () => (await session(worker, tabId))?.playerConnected).toBe(true);
   } finally {
     await context.close();
     if (!profile.startsWith(root + sep)) throw new Error('Unsafe test profile path');
@@ -455,27 +457,50 @@ test('opening Malmark reconnects a missing tracker on an already matched autopla
   }
 });
 
-test('a failed iframe injection retries and discovers delayed shadow players and replacements', async () => {
+test('a failed iframe injection recovers delayed players and stays connected through fullscreen autoplay', async () => {
   test.setTimeout(60000);
   const root = resolve('artifacts');
   await mkdir(root, { recursive: true });
   const profile = await mkdtemp(resolve(root, 'player-recovery-profile-'));
   const extension = resolve('dist/chromium');
+  const nativeChrome = !!process.env.MALMARK_CHROME_PATH;
   const context = await chromium.launchPersistentContext(profile, {
-    channel: 'chromium',
+    channel: nativeChrome ? undefined : 'chromium',
     headless: true,
-    executablePath: process.env.MALMARK_BROWSER_PATH,
-    args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
+    executablePath: nativeChrome
+      ? process.env.MALMARK_CHROME_PATH
+      : process.env.MALMARK_BROWSER_PATH,
+    ignoreDefaultArgs: nativeChrome ? ['--disable-extensions'] : undefined,
+    args: nativeChrome
+      ? ['--enable-unsafe-extension-debugging']
+      : [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
   });
   try {
+    if (nativeChrome)
+      await (
+        await context.browser()!.newBrowserCDPSession()
+      ).send('Extensions.loadUnpacked', { path: extension });
     const worker = context.serviceWorkers()[0] || (await context.waitForEvent('serviceworker'));
     await fixtures(context, worker, true);
     await context.route('https://myanimelist.net/malmark-player-fixture', (route) =>
-      route.fulfill({ contentType: 'text/html', body: '<div id="shell"></div>' }),
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<button id="fullscreen" onclick="document.querySelector(\'#shell\').requestFullscreen()">Fullscreen player</button><div id="shell"></div>',
+      }),
     );
     await worker.evaluate(() => {
       const root = globalThis as any;
       const execute = root.chrome.scripting.executeScript.bind(root.chrome.scripting);
+      root.playbackMessages = [];
+      root.chrome.runtime.onMessage.addListener((message: any, sender: any) => {
+        if (message.type === 'PLAYBACK')
+          root.playbackMessages.push({
+            pageUrl: message.pageUrl,
+            senderUrl: sender.url,
+            frameId: sender.frameId,
+            time: message.playback.currentTime,
+          });
+      });
       root.injectionAttempts = 0;
       root.chrome.scripting.executeScript = (details: any, ...rest: any[]) => {
         if (
@@ -495,6 +520,7 @@ test('a failed iframe injection retries and discovers delayed shadow players and
     await page.evaluate(() => {
       const frame = document.createElement('iframe');
       frame.src = 'https://myanimelist.net/malmark-player-fixture';
+      frame.allowFullscreen = true;
       frame.style.cssText = 'width:700px;height:400px';
       document.body.append(frame);
     });
@@ -559,8 +585,45 @@ test('a failed iframe injection retries and discovers delayed shadow players and
     );
     await expect.poll(async () => (await session(worker, tabId))?.progress?.position).toBe(25);
     expect((await session(worker, tabId)).progress.watched).toBe(0);
+    await page.frameLocator('iframe').getByRole('button', { name: 'Fullscreen player' }).click();
+    const playerFrame = page.frames().find((f) => f.url().includes('malmark-player-fixture'))!;
+    await expect
+      .poll(() => playerFrame.evaluate(() => document.fullscreenElement?.id))
+      .toBe('shell');
+    await worker.evaluate(
+      async ({ tabId, frameId }) => {
+        const api = (globalThis as any).chrome;
+        const key = `tab:${tabId}`;
+        const s = (await api.storage.session.get(key))[key];
+        s.progress = { ...s.progress, ranges: [[0, 800]], watched: 800 };
+        await api.storage.session.set({ [key]: s });
+        await api.scripting.executeScript({
+          target: { tabId, frameIds: [frameId] },
+          func: () => {
+            const video = document
+              .querySelector('#shell')!
+              .shadowRoot!.querySelector('section')!
+              .shadowRoot!.querySelectorAll('video')[1];
+            Object.defineProperties(video, {
+              currentTime: { value: 1000, configurable: true },
+              ended: { value: true, configurable: true },
+            });
+            video.dispatchEvent(new Event('ended'));
+          },
+        });
+      },
+      { tabId, frameId },
+    );
+    await expect
+      .poll(() =>
+        worker.evaluate(
+          async () =>
+            (await (globalThis as any).chrome.storage.local.get('pending')).pending?.[0]?.episode,
+        ),
+      )
+      .toBe(2);
     const previousVideo = (await session(worker, tabId)).progress.last.videoId;
-    // Autoplay reuses the embedded document and its video while only the top URL changes.
+    // Autoplay reuses the embedded document/video while the watch page and player update their URLs.
     await page.evaluate(() => {
       history.pushState({}, '', '/watch/EP3/next');
       document.querySelector('h1')!.textContent = 'Episode 3';
@@ -574,17 +637,52 @@ test('a failed iframe injection retries and discovers delayed shadow players and
               .querySelector('#shell')!
               .shadowRoot!.querySelector('section')!
               .shadowRoot!.querySelectorAll('video');
+            history.replaceState({}, '', '/malmark-player-fixture?episode=3');
             Object.defineProperty(videos[1], 'currentTime', { value: 0, configurable: true });
+            Object.defineProperty(videos[1], 'ended', { value: false, configurable: true });
           },
         });
       },
       { tabId, frameId },
     );
     await expect.poll(async () => (await session(worker, tabId))?.episode).toBe(3);
-    await expect.poll(async () => (await session(worker, tabId))?.progress?.position).toBe(0);
-    await expect.poll(async () => (await session(worker, tabId))?.playerConnected).toBe(true);
+    try {
+      await expect.poll(async () => (await session(worker, tabId))?.progress?.position).toBe(0);
+      await expect.poll(async () => (await session(worker, tabId))?.playerConnected).toBe(true);
+    } catch (error) {
+      console.log(
+        'Fullscreen playback diagnostics',
+        await worker.evaluate(() => (globalThis as any).playbackMessages.slice(-8)),
+        await session(worker, tabId),
+      );
+      throw error;
+    }
     expect((await session(worker, tabId)).progress.last.videoId).not.toBe(previousVideo);
     expect((await session(worker, tabId)).progress.watched).toBe(0);
+    expect(await playerFrame.evaluate(() => document.fullscreenElement?.id)).toBe('shell');
+    await worker.evaluate(
+      async ({ tabId, frameId }) => {
+        await (globalThis as any).chrome.scripting.executeScript({
+          target: { tabId, frameIds: [frameId] },
+          func: () => {
+            const video = document
+              .querySelector('#shell')!
+              .shadowRoot!.querySelector('section')!
+              .shadowRoot!.querySelectorAll('video')[1];
+            Object.defineProperty(video, 'currentTime', { value: 1, configurable: true });
+            video.dispatchEvent(new Event('pause'));
+          },
+        });
+      },
+      { tabId, frameId },
+    );
+    await expect.poll(async () => (await session(worker, tabId))?.progress?.watched).toBe(1);
+    expect(
+      await worker.evaluate(
+        async () =>
+          (await (globalThis as any).chrome.storage.local.get('pending')).pending[0].episode,
+      ),
+    ).toBe(2);
   } finally {
     await context.close();
     if (!profile.startsWith(root + sep)) throw new Error('Unsafe test profile path');

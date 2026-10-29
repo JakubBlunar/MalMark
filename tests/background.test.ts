@@ -69,6 +69,7 @@ const mock = vi.hoisted(() => {
       unregisterContentScripts: vi.fn(),
     },
     webNavigation: {
+      getFrame: vi.fn(async (): Promise<{ url: string; documentId?: string } | null> => null),
       getAllFrames: vi.fn(async () => [] as { frameId: number; url: string }[]),
       onCommitted: { addListener: vi.fn() },
       onHistoryStateUpdated: { addListener: vi.fn() },
@@ -187,6 +188,7 @@ beforeEach(async () => {
   });
   mock.browser.tabs.get.mockResolvedValue({ id: 1, url: content.url });
   mock.browser.permissions.contains.mockResolvedValue(false);
+  mock.browser.webNavigation.getFrame.mockReset().mockResolvedValue(null);
 });
 describe('OAuth and MAL transport', () => {
   it('requires personal API setup for unpacked builds, without changing an existing login', async () => {
@@ -603,6 +605,90 @@ describe('finished series completion', () => {
 });
 
 describe('background consent boundary', () => {
+  it.each([0, 7])(
+    'accepts a live SPA player when Chrome retains the old sender URL (frame %s)',
+    async (frameId) => {
+      await mock.browser.storage.session.set({ 'tab:1': session() });
+      const pageUrl = frameId ? 'https://static.crunchyroll.com/player?episode=2' : content.url;
+      const sender = {
+        ...content,
+        frameId,
+        documentId: 'same-document',
+        url: frameId
+          ? 'https://static.crunchyroll.com/player?episode=1'
+          : 'https://www.crunchyroll.com/watch/previous',
+      };
+      mock.browser.permissions.contains.mockResolvedValue(true);
+      mock.browser.webNavigation.getFrame.mockResolvedValueOnce({
+        url: pageUrl,
+        documentId: 'same-document',
+      });
+      const reply = await message(
+        {
+          type: 'PLAYBACK',
+          pageUrl,
+          playback: {
+            videoId: 'reused',
+            currentTime: 5,
+            duration: 1000,
+            paused: false,
+            ended: false,
+            rate: 1,
+            sentAt: Date.now(),
+          },
+        },
+        sender,
+      );
+      expect(reply.ok).toBe(true);
+      const saved = mock.getSession()['tab:1'] as WatchSession;
+      expect(saved.playerConnected).toBe(true);
+      expect(saved.progress.position).toBe(5);
+      expect(saved.progress.watched).toBe(0);
+    },
+  );
+  it.each(['old-url', 'old-document', 'missing-frame', 'cross-origin', 'revoked-permission'])(
+    'rejects an invalid SPA player sample: %s',
+    async (invalid) => {
+      await mock.browser.storage.session.set({ 'tab:1': session() });
+      const pageUrl = 'https://static.crunchyroll.com/player?episode=2';
+      mock.browser.permissions.contains.mockResolvedValue(invalid !== 'revoked-permission');
+      mock.browser.webNavigation.getFrame.mockResolvedValueOnce(
+        invalid === 'missing-frame'
+          ? null
+          : {
+              url:
+                invalid === 'old-url' ? 'https://static.crunchyroll.com/player?episode=1' : pageUrl,
+              documentId: invalid === 'old-document' ? 'new-document' : 'same-document',
+            },
+      );
+      await message(
+        {
+          type: 'PLAYBACK',
+          pageUrl,
+          playback: {
+            videoId: 'reused',
+            currentTime: 5,
+            duration: 1000,
+            paused: false,
+            ended: false,
+            rate: 1,
+            sentAt: Date.now(),
+          },
+        },
+        {
+          ...content,
+          frameId: 7,
+          documentId: 'same-document',
+          url:
+            invalid === 'cross-origin'
+              ? 'https://evil.example/player'
+              : 'https://static.crunchyroll.com/player?episode=1',
+        },
+      );
+      expect((mock.getSession()['tab:1'] as WatchSession).playerConnected).toBe(false);
+      expect((mock.getSession()['tab:1'] as WatchSession).progress.watched).toBe(0);
+    },
+  );
   it.each(['healthy', 'missing'])(
     'reconnects permitted player frames after a manual match (%s tracker)',
     async (health) => {

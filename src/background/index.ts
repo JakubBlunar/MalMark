@@ -234,7 +234,28 @@ async function playbackMessage(
     !(await supportedUrl(tab.url))
   )
     return;
-  if (!sender.url || !samePage(sender.url, message.pageUrl)) return;
+  if (!sender.url) return;
+  if (!samePage(sender.url, message.pageUrl)) {
+    // Chrome can retain a content script's original sender URL after pushState/replaceState.
+    // Confirm the live frame and document instead of discarding its new playback samples.
+    let origin: string;
+    try {
+      origin = new URL(message.pageUrl).origin;
+      if (origin !== new URL(sender.url).origin) return;
+    } catch {
+      return;
+    }
+    if (!(await browser.permissions.contains({ origins: [origin + '/*'] }))) return;
+    const frame = await browser.webNavigation
+      .getFrame({ tabId, frameId: sender.frameId })
+      .catch(() => null);
+    if (
+      !frame ||
+      !samePage(frame.url, message.pageUrl) ||
+      (sender.documentId && frame.documentId && sender.documentId !== frame.documentId)
+    )
+      return;
+  }
   const p = message.playback;
   if (
     !p ||
