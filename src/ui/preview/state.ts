@@ -3,7 +3,13 @@ import type { PublicState } from '../../shared/types';
 export function previewState(): PublicState {
   const demo = new URLSearchParams(location.search).get('demo');
   const state: PublicState = {
-    settings: { threshold: 65, minWatchSeconds: 60, showPrompts: true, promptAtEnd: true },
+    settings: {
+      autoProgress: false,
+      threshold: 65,
+      minWatchSeconds: 60,
+      showPrompts: true,
+      promptAtEnd: true,
+    },
     oauth: {
       mode:
         new URLSearchParams(location.search).get('distribution') === 'store' ? 'store' : 'unpacked',

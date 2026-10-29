@@ -1,6 +1,6 @@
 # Malmark
 
-A browser extension for Chrome, Brave and Firefox that detects the anime you’re watching and helps keep your MyAnimeList progress up to date. Every list change needs your approval.
+A browser extension for Chrome, Brave and Firefox that detects the anime you’re watching and helps keep your MyAnimeList progress up to date. Updates require confirmation by default; automatic next-episode progress is optional.
 
 - Crunchyroll support built in, with manual matching and episode offsets.
 - A persistent sidebar, popup, profile, and watch settings.
@@ -9,6 +9,7 @@ A browser extension for Chrome, Brave and Firefox that detects the anime you’r
 - Restored/activated tabs and opening Malmark retry tracker connections. The badge shows ✓ for a match with recent player data, or … while waiting for the player.
 - Manual watched-count controls and reminders that survive autoplay.
 - Update progress directly from an episode reminder, or choose Later to keep it queued in Malmark.
+- Opt into automatic progress for the next episode of an anime in Currently Watching, with a four-second success notice. Gaps and failed updates stay queued for confirmation; completion and scores remain manual.
 - Complete and optionally score finished-airing anime after the final episode.
 - A selector picker for websites you choose to add, with permission per domain.
 

@@ -27,7 +27,8 @@ export function PrivacyCard({
         MyAnimeList to find a match. No analytics or third-party tracking services.
       </p>
       <p className="privacy-copy">
-        List changes always need your approval. Partial episode progress stays for up to 30 days,
+        Updates ask for confirmation by default. You can enable automatic progress for the next
+        episode of anime in Currently Watching. Partial episode progress stays for up to 30 days,
         with at most 100 episodes saved. Disconnecting removes tokens, playback progress and queued
         updates; saved matches stay on this device.
       </p>

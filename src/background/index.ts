@@ -27,6 +27,8 @@ import { configForUrl, registerSite, retireLegacyAccess, supportedUrl } from './
 import { chromiumSidePanel } from '../shared/sidebar';
 import { OAUTH_SETUP_REQUIRED } from '../shared/config';
 import { inlinePromptContext, inlinePromptNonce } from './inline-prompts';
+import { automaticProgress } from './automatic-progress';
+import { getProgressNotice, showProgressNotice } from './progress-notices';
 import {
   discardWatchProgress,
   pruneWatchHistory,
@@ -194,8 +196,9 @@ async function completed(tabId: number, session: WatchSession): Promise<void> {
     session.anime.my_list_status.is_rewatching
   )
     return;
-  if (!isComplete(session.progress, await getSettings())) return;
-  const anime = session.anime;
+  const settings = await getSettings();
+  if (!isComplete(session.progress, settings)) return;
+  let anime = session.anime;
   if (anime.num_episodes && session.episode > anime.num_episodes) return;
   if (session.episode <= anime.my_list_status!.num_episodes_watched) return;
   const auth = await getAuth();
@@ -206,14 +209,38 @@ async function completed(tabId: number, session: WatchSession): Promise<void> {
     resolved?: Record<string, number>;
   };
   if (resolved[key] > Date.now() - 7 * 86400000 || pending.some((p) => p.id === key)) return;
-  pending.push({
+  const result = await automaticProgress(anime, session.episode, session.progress, settings);
+  if (result.anime !== anime) {
+    anime = result.anime;
+    session.anime = anime;
+    await refreshAnimeSessions(anime);
+  }
+  const item: PendingUpdate = {
     id: key,
     anime,
     episode: session.episode,
-    previous: anime.my_list_status!.num_episodes_watched,
+    previous: anime.my_list_status?.num_episodes_watched ?? 0,
     tabId,
     createdAt: Date.now(),
-  });
+    ...(result.error ? { error: result.error } : {}),
+  };
+  if (result.kind !== 'manual') {
+    if (result.kind === 'updated')
+      await showProgressNotice(
+        tabId,
+        key,
+        anime.alternative_titles?.en || anime.title,
+        session.episode,
+      );
+    await resolvePending(item);
+    return;
+  }
+  if (!anime.my_list_status || anime.my_list_status.is_rewatching) {
+    await browser.tabs.sendMessage(tabId, { type: 'PROMPT_CHANGED' }).catch(() => undefined);
+    return;
+  }
+  if (anime.num_episodes && session.episode > anime.num_episodes) return;
+  pending.push(item);
   await browser.storage.local.set({ pending: pending.slice(-50) });
   await badge(tabId, session);
   await browser.tabs.sendMessage(tabId, { type: 'PROMPT_CHANGED' }).catch(() => undefined);
@@ -456,13 +483,15 @@ async function uiMessage(message: Message): Promise<unknown> {
         s.minWatchSeconds < 30 ||
         s.minWatchSeconds > 600 ||
         typeof s.showPrompts !== 'boolean' ||
-        typeof s.promptAtEnd !== 'boolean'
+        typeof s.promptAtEnd !== 'boolean' ||
+        (s.autoProgress !== undefined && typeof s.autoProgress !== 'boolean')
       )
         throw new Error(
           'Check the settings. Completion must be 50–100%, with 30–600 minimum seconds.',
         );
       await browser.storage.local.set({
         settings: {
+          autoProgress: s.autoProgress ?? false,
           threshold: s.threshold,
           minWatchSeconds: s.minWatchSeconds,
           showPrompts: s.showPrompts,
@@ -897,12 +926,14 @@ browser.runtime.onMessage.addListener((raw: unknown, sender: browser.Runtime.Mes
       }
       return serialized(async () => {
         const session = await getSession(sender.tab!.id!);
-        const pending = (await getAuth())
+        const auth = await getAuth();
+        const pending = auth
           ? (await getPending()).filter((p) => p.tabId === sender.tab!.id && !p.deferred)
           : [];
         const item = pending.at(-1);
         return {
           pending,
+          notice: await getProgressNotice(sender.tab!.id!, auth?.profile?.id),
           nonce: item
             ? await inlinePromptNonce(sender.tab!.id!, tab.url!, item, sender.frameId ?? 0)
             : undefined,
@@ -924,7 +955,9 @@ browser.runtime.onMessage.addListener((raw: unknown, sender: browser.Runtime.Mes
 
 browser.tabs.onRemoved.addListener((tabId) => {
   recovery.delete(tabId);
-  void serialized(() => browser.storage.session.remove([`tab:${tabId}`, `inlinePrompt:${tabId}`]));
+  void serialized(() =>
+    browser.storage.session.remove([`tab:${tabId}`, `inlinePrompt:${tabId}`, `notice:${tabId}`]),
+  );
 });
 
 browser.webNavigation.onHistoryStateUpdated.addListener((details) => {

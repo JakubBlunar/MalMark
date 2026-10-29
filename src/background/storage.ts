@@ -10,6 +10,7 @@ import type {
 } from '../shared/types';
 
 export const defaults: Settings = {
+  autoProgress: false,
   threshold: 65,
   minWatchSeconds: 60,
   showPrompts: true,
@@ -20,6 +21,7 @@ export async function getSettings(): Promise<Settings> {
   const { settings } = (await browser.storage.local.get('settings')) as { settings?: Settings };
   // Ignore old per-user OAuth configuration without touching existing login tokens.
   return {
+    autoProgress: settings?.autoProgress === true,
     threshold: settings?.threshold ?? defaults.threshold,
     minWatchSeconds: settings?.minWatchSeconds ?? defaults.minWatchSeconds,
     showPrompts: settings?.showPrompts ?? defaults.showPrompts,

@@ -34,6 +34,25 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 describe('recoverable content connection', () => {
+  it('shows an automatic success for four seconds even with manual prompts disabled', async () => {
+    await import('../src/content/index');
+    await vi.advanceTimersByTimeAsync(6000);
+    const notice = { id: '5:1:2', title: 'A Show', episode: 2, expiresAt: Date.now() + 4000 };
+    mock.send.mockImplementation(async (message) => ({
+      ok: true,
+      data:
+        message.type === 'PROMPT_STATE' ? { pending: [], showPrompts: false, notice } : undefined,
+    }));
+    await mock.add.mock.calls.at(-1)![0]({ type: 'PROMPT_CHANGED' });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(document.querySelector('[data-malmark-notice]')?.getAttribute('aria-label')).toContain(
+      'Episode 2 saved',
+    );
+    await vi.advanceTimersByTimeAsync(3999);
+    expect(document.querySelector('[data-malmark-notice]')).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(document.querySelector('[data-malmark-notice]')).toBeNull();
+  });
   it('sizes the current reminder from verified messages, follows viewport changes and can shrink', async () => {
     vi.stubGlobal('innerHeight', 900);
     const attach = vi.spyOn(Element.prototype, 'attachShadow');

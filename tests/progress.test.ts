@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { accumulate, addRange, emptyProgress, isComplete } from '../src/shared/progress';
 import type { Playback, Settings } from '../src/shared/types';
 const settings: Settings = {
+  autoProgress: false,
   threshold: 90,
   minWatchSeconds: 60,
   showPrompts: true,

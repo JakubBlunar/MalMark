@@ -20,6 +20,11 @@ export function PendingUpdateCard({
       </div>
       <h2>Another episode, in the books.</h2>
       <p>{item.anime.alternative_titles?.en || item.anime.title}</p>
+      {item.error && (
+        <p className="helper warning-text" role="alert">
+          {item.error}
+        </p>
+      )}
       <div className="progress-change">
         <span>
           {item.previous}

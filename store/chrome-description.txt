@@ -10,7 +10,7 @@ Watch anime on Crunchyroll, check the detected anime and episode, and confirm wh
 • Mark Finished Airing entries completed and optionally give them a score after the final episode.
 • Add other HTTPS websites yourself by choosing their title and episode elements and granting access to that domain.
 
-You approve every list change. Sign in through MyAnimeList; store installations use Malmark’s public app registration and do not require you to create an API app.
+Updates ask for confirmation by default. Optionally enable automatic progress for exactly the next episode of an anime already in Currently Watching. It checks fresh MAL progress and shows a four-second success notice; other cases and failed updates keep the confirmation flow. Completion and scoring remain manual. Sign in through MyAnimeList; store installations use Malmark’s public app registration and do not require you to create an API app.
 
 Privacy: account tokens, settings, saved matches and playback checkpoints stay in this browser. Anime titles and searches are sent to the official MAL API for matching; approved episode counts, completion status and scores go to MAL. Partial progress expires after 30 days, with at most 100 episodes retained. No Malmark backend, analytics or advertising.
 

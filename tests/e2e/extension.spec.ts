@@ -119,6 +119,7 @@ test('built Chromium extension detects a supported page and serves its popup', a
       async () => (await (globalThis as any).chrome.storage.local.get('settings')).settings,
     );
     expect(saved).toEqual({
+      autoProgress: false,
       threshold: 85,
       minWatchSeconds: 60,
       showPrompts: true,

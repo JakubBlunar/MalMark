@@ -73,7 +73,11 @@ export function WatchingView({
               />
               <div className="subtle-note">
                 <ShieldCheck size={14} />
-                <span>We’ll ask before changing anything on your list.</span>
+                <span>
+                  {state.settings.autoProgress
+                    ? 'Automatic progress is on for next episodes. Other changes need your confirmation.'
+                    : 'We’ll ask before updating your list. Automatic progress is off.'}
+                </span>
               </div>
             </>
           ) : (
@@ -94,7 +98,7 @@ export function WatchingView({
         <ChevronRight size={13} />
         <div>
           <span>03</span>
-          <p>Confirm & log</p>
+          <p>{state.settings.autoProgress ? 'Track & log' : 'Confirm & log'}</p>
         </div>
       </div>
     </>

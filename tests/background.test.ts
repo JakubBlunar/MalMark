@@ -354,6 +354,7 @@ describe('OAuth and MAL transport', () => {
     await connect();
     expect((mock.getLocal().auth as Auth).clientId).toBe('client');
     expect(await getSettings()).toEqual({
+      autoProgress: false,
       threshold: 85,
       minWatchSeconds: 90,
       showPrompts: false,
@@ -365,6 +366,7 @@ describe('OAuth and MAL transport', () => {
       type: 'GET_STATE',
     });
     expect(response.ok && response.data.settings).toEqual({
+      autoProgress: false,
       threshold: 90,
       minWatchSeconds: 60,
       showPrompts: true,
@@ -381,6 +383,7 @@ describe('OAuth and MAL transport', () => {
     };
     expect((await message({ type: 'SAVE_SETTINGS', settings })).ok).toBe(true);
     expect(mock.getLocal().settings).toEqual({
+      autoProgress: false,
       threshold: 95,
       minWatchSeconds: 120,
       showPrompts: false,
@@ -1338,6 +1341,190 @@ describe('background consent boundary', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 });
+describe('opt-in automatic progress', () => {
+  async function prepare(animeOverride: Partial<Anime> = {}, watched = 900, position = watched) {
+    const s = session();
+    s.anime = { ...anime, ...animeOverride };
+    s.progress = { ranges: [[0, watched]], watched, duration: 1000, position };
+    await mock.browser.storage.session.set({ 'tab:1': s });
+    await mock.browser.storage.local.set({
+      settings: {
+        autoProgress: true,
+        threshold: 90,
+        minWatchSeconds: 60,
+        showPrompts: true,
+        promptAtEnd: true,
+      },
+    });
+    return s;
+  }
+  const tick = (position = 900) =>
+    message(
+      {
+        type: 'PLAYBACK',
+        pageUrl: content.url,
+        playback: {
+          videoId: 'current',
+          currentTime: position,
+          duration: 1000,
+          paused: false,
+          ended: false,
+          rate: 1,
+          sentAt: Date.now(),
+        },
+      },
+      content,
+    );
+
+  it('logs exactly the next episode once, refreshes every tab and expires its success notice after four seconds', async () => {
+    const now = Date.now();
+    const time = vi.spyOn(Date, 'now').mockReturnValue(now);
+    const s = await prepare();
+    await mock.browser.storage.session.set({ 'tab:2': s });
+    await mock.browser.storage.local.set({
+      settings: {
+        autoProgress: true,
+        threshold: 90,
+        minWatchSeconds: 60,
+        showPrompts: false,
+        promptAtEnd: true,
+      },
+    });
+    const status = { ...anime.my_list_status!, num_episodes_watched: 2 };
+    const fetch = vi.fn().mockResolvedValueOnce(json(anime)).mockResolvedValueOnce(json(status));
+    vi.stubGlobal('fetch', fetch);
+    await Promise.all([tick(), tick()]);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch.mock.calls[1][1].body).toBe('num_watched_episodes=2');
+    for (const tab of [1, 2])
+      expect((mock.getSession()[`tab:${tab}`] as WatchSession).anime?.my_list_status).toEqual(
+        status,
+      );
+    expect(mock.getLocal().pending ?? []).toEqual([]);
+    expect(mock.getLocal().resolved).toEqual({ '5:1:2': now });
+    expect(mock.getSession()['notice:1']).toEqual({
+      id: '5:1:2',
+      title: anime.title,
+      episode: 2,
+      expiresAt: now + 4000,
+    });
+    const state = await message<{ notice?: { episode: number }; showPrompts: boolean }>(
+      { type: 'PROMPT_STATE' },
+      content,
+    );
+    expect(state.ok && state.data.notice?.episode).toBe(2);
+    expect(state.ok && state.data.showPrompts).toBe(false);
+    time.mockReturnValue(now + 4001);
+    const expired = await message<{ notice?: unknown }>({ type: 'PROMPT_STATE' }, content);
+    expect(expired.ok && expired.data.notice).toBeUndefined();
+    expect(mock.getSession()['notice:1']).toBeUndefined();
+  });
+  it.each(['off', 'gap', 'already-watched', 'new-anime', 'on-hold', 'rewatching', 'end-only'])(
+    'keeps the existing flow for %s',
+    async (condition) => {
+      const s = await prepare(
+        {},
+        condition === 'end-only' ? 600 : 900,
+        condition === 'end-only' ? 990 : 900,
+      );
+      if (condition === 'off')
+        await mock.browser.storage.local.set({
+          settings: {
+            autoProgress: false,
+            threshold: 90,
+            minWatchSeconds: 60,
+            showPrompts: true,
+            promptAtEnd: true,
+          },
+        });
+      if (condition === 'gap') s.episode = 3;
+      if (condition === 'already-watched') s.episode = 1;
+      if (condition === 'new-anime') s.anime = { ...anime, my_list_status: undefined };
+      if (condition === 'on-hold')
+        s.anime = { ...anime, my_list_status: { ...anime.my_list_status!, status: 'on_hold' } };
+      if (condition === 'rewatching')
+        s.anime = { ...anime, my_list_status: { ...anime.my_list_status!, is_rewatching: true } };
+      await mock.browser.storage.session.set({ 'tab:1': s });
+      const fetch = vi.fn();
+      vi.stubGlobal('fetch', fetch);
+      await tick(condition === 'end-only' ? 990 : 900);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(mock.getSession()['notice:1']).toBeUndefined();
+      const manual = ['off', 'gap', 'on-hold', 'end-only'].includes(condition);
+      expect((mock.getLocal().pending as unknown[] | undefined)?.length ?? 0).toBe(manual ? 1 : 0);
+    },
+  );
+  it.each(['gap', 'removed', 'on-hold', 'rewatching', 'already-logged'])(
+    'checks fresh MAL state before writing: %s',
+    async (change) => {
+      await prepare();
+      const fresh: Anime = {
+        ...anime,
+        my_list_status:
+          change === 'removed'
+            ? undefined
+            : {
+                ...anime.my_list_status!,
+                num_episodes_watched: change === 'gap' ? 0 : change === 'already-logged' ? 2 : 1,
+                status: change === 'on-hold' ? 'on_hold' : 'watching',
+                is_rewatching: change === 'rewatching',
+              },
+      };
+      const fetch = vi.fn().mockImplementation(async () => json(fresh));
+      vi.stubGlobal('fetch', fetch);
+      await tick();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(mock.getSession()['notice:1']).toBeUndefined();
+      expect((mock.getSession()['tab:1'] as WatchSession).anime).toEqual(fresh);
+      if (change === 'gap' || change === 'on-hold')
+        expect(mock.getLocal().pending).toEqual([
+          expect.objectContaining({ previous: fresh.my_list_status!.num_episodes_watched }),
+        ]);
+      else expect(mock.getLocal().pending ?? []).toEqual([]);
+    },
+  );
+  it.each(['read', 'write', 'unconfirmed'])(
+    'keeps a failed automatic %s queued for manual retry without repeated writes',
+    async (failure) => {
+      await prepare();
+      const fetch = vi.fn();
+      if (failure === 'read') fetch.mockResolvedValueOnce(json({}, 503));
+      else
+        fetch
+          .mockResolvedValueOnce(json(anime))
+          .mockResolvedValueOnce(failure === 'write' ? json({}, 503) : json(anime.my_list_status));
+      vi.stubGlobal('fetch', fetch);
+      await tick();
+      const attempts = fetch.mock.calls.length;
+      await tick();
+      expect(fetch).toHaveBeenCalledTimes(attempts);
+      expect(mock.getLocal().pending).toEqual([
+        expect.objectContaining({
+          id: '5:1:2',
+          error: expect.stringContaining('Automatic update failed'),
+        }),
+      ]);
+      expect(mock.getSession()['notice:1']).toBeUndefined();
+      fetch
+        .mockResolvedValueOnce(json(anime))
+        .mockResolvedValueOnce(json({ ...anime.my_list_status, num_episodes_watched: 2 }));
+      expect((await message({ type: 'APPROVE_UPDATE', id: '5:1:2' })).ok).toBe(true);
+      expect(mock.getLocal().pending).toEqual([]);
+    },
+  );
+  it('only accepts a boolean opt-in from extension settings', async () => {
+    const settings = { ...(await getSettings()), autoProgress: true };
+    expect((await message({ type: 'SAVE_SETTINGS', settings }, content)).ok).toBe(false);
+    expect((await getSettings()).autoProgress).toBe(false);
+    expect(
+      (await message({ type: 'SAVE_SETTINGS', settings: { ...settings, autoProgress: 'true' } }))
+        .ok,
+    ).toBe(false);
+    expect((await message({ type: 'SAVE_SETTINGS', settings })).ok).toBe(true);
+    expect((await getSettings()).autoProgress).toBe(true);
+  });
+});
+
 describe('website setup authorization', () => {
   it('does not enable arbitrary or retired domains from a host grant alone', async () => {
     mock.browser.permissions.contains.mockResolvedValue(true);

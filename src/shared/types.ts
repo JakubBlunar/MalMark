@@ -51,6 +51,7 @@ export interface Profile {
 }
 
 export interface Settings {
+  autoProgress: boolean;
   threshold: number;
   minWatchSeconds: number;
   showPrompts: boolean;
@@ -108,7 +109,15 @@ export interface PendingUpdate {
   previous: number;
   createdAt: number;
   deferred?: boolean;
+  error?: string;
   tabId: number;
+}
+
+export interface ProgressNotice {
+  id: string;
+  title: string;
+  episode: number;
+  expiresAt: number;
 }
 
 export interface Auth {

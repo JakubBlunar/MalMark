@@ -48,9 +48,9 @@ export function AppNavigation({
             Your call.
           </p>
           <small>
-            Every update starts
+            Confirm updates
             <br />
-            with your approval.
+            or enable automatic progress.
           </small>
         </div>
       )}

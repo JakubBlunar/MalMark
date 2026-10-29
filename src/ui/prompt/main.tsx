@@ -77,6 +77,7 @@ function EpisodePrompt() {
               This also marks episodes {item.previous + 1}–{item.episode - 1} as watched.
             </p>
           )}
+          {item.error && <p className="warning">{item.error}</p>}
           <div className="actions">
             <button
               disabled={busy}

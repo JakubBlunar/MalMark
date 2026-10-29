@@ -1,6 +1,13 @@
 import browser from 'webextension-polyfill';
 import { detect } from './detect';
-import type { Message, PendingUpdate, Playback, Reply, SiteConfig } from '../shared/types';
+import type {
+  Message,
+  PendingUpdate,
+  Playback,
+  ProgressNotice,
+  Reply,
+  SiteConfig,
+} from '../shared/types';
 import { siteForUrl } from '../shared/sites';
 import { startPicker } from './picker';
 import { createPlayerTracker } from './player';
@@ -59,6 +66,7 @@ function start(): { stop: () => void } | undefined {
   let promptFrame: HTMLIFrameElement | undefined;
   let promptNonce = '';
   let promptHeight = 220;
+  let noticeTimer: number | undefined;
   const hiddenPrompts = new Set<string>();
 
   function resizePrompt(): void {
@@ -90,14 +98,18 @@ function start(): { stop: () => void } | undefined {
       showPrompts: boolean;
       newAnime?: { id: number; title: string };
       nonce?: string;
+      notice?: ProgressNotice;
     }>({ type: 'PROMPT_STATE' });
     const item = state?.pending.at(-1);
-    const id = item
-      ? `${item.id}:${state?.nonce ?? ''}`
-      : state?.newAnime
-        ? `add:${state.newAnime.id}`
-        : '';
-    if (!state?.showPrompts || !id || hiddenPrompts.has(id)) {
+    const notice = state?.notice && state.notice.expiresAt > Date.now() ? state.notice : undefined;
+    const id = notice
+      ? `notice:${notice.id}`
+      : item
+        ? `${item.id}:${state?.nonce ?? ''}`
+        : state?.newAnime
+          ? `add:${state.newAnime.id}`
+          : '';
+    if (!state || (!state.showPrompts && !notice) || !id || hiddenPrompts.has(id)) {
       host?.remove();
       host = undefined;
       return;
@@ -106,12 +118,42 @@ function start(): { stop: () => void } | undefined {
       placePrompt();
       return;
     }
+    window.clearTimeout(noticeTimer);
     host?.remove();
     host = document.createElement('div');
     host.setAttribute('data-malmark-prompt', '');
     host.dataset.prompt = id;
     host.style.cssText = 'all:initial;position:fixed;right:24px;bottom:24px;z-index:2147483647;';
     const shadow = host.attachShadow({ mode: 'closed' });
+    if (notice) {
+      host.setAttribute('data-malmark-notice', '');
+      host.setAttribute('role', 'status');
+      host.setAttribute('aria-live', 'polite');
+      host.setAttribute('aria-label', `MyAnimeList updated. Episode ${notice.episode} saved.`);
+      const style = document.createElement('style');
+      style.textContent =
+        '.notice{box-sizing:border-box;font:14px/1.5 system-ui,sans-serif;background:#181b24;color:#f3f3fa;border:1px solid #477563;border-radius:16px;padding:18px;width:min(360px,calc(100vw - 48px));box-shadow:0 12px 40px #0007}strong{display:block;color:#75dfb5;font-size:16px;margin-bottom:6px}p{margin:0;color:#c9ccda;overflow-wrap:anywhere}';
+      const card = document.createElement('div');
+      card.className = 'notice';
+      const title = document.createElement('strong');
+      title.textContent = 'Progress updated';
+      const text = document.createElement('p');
+      text.textContent = `${notice.title} · Episode ${notice.episode} saved on MyAnimeList.`;
+      card.append(title, text);
+      shadow.append(style, card);
+      placePrompt();
+      noticeTimer = window.setTimeout(
+        () => {
+          if (host?.dataset.prompt === id) {
+            host.remove();
+            host = undefined;
+            void prompt();
+          }
+        },
+        Math.max(0, Math.min(4000, notice.expiresAt - Date.now())),
+      );
+      return;
+    }
     if (item && state.nonce) {
       const frame = document.createElement('iframe');
       frame.src = browser.runtime.getURL(`prompt.html#${state.nonce}`);
@@ -350,6 +392,7 @@ function start(): { stop: () => void } | undefined {
   function stop() {
     valid = false;
     clearInterval(timer);
+    window.clearTimeout(noticeTimer);
     players.stop();
     events.abort();
     host?.remove();

@@ -56,9 +56,25 @@ export function PreferencesForm({
           </span>
           <div>
             <h2>Watch tracking</h2>
-            <p>A gentle nudge when the episode is done.</p>
+            <p>Choose how finished episodes update your list.</p>
           </div>
         </div>
+        <label className="toggle-row" htmlFor="auto-progress">
+          <span>
+            <b>Automatic progress updates</b>
+            <small>
+              Log only the next episode of anime in Currently Watching after reaching the threshold.
+              Other cases ask for confirmation. Success appears for four seconds.
+            </small>
+          </span>
+          <input
+            id="auto-progress"
+            type="checkbox"
+            checked={draft.autoProgress}
+            onChange={(e) => change('autoProgress', e.target.checked)}
+          />
+          <i className="toggle" />
+        </label>
         <label htmlFor="threshold" className="range-label">
           Completion threshold <b>{draft.threshold}%</b>
         </label>
@@ -101,7 +117,10 @@ export function PreferencesForm({
         <label className="toggle-row" htmlFor="show-prompts">
           <span>
             <b>In-page prompts</b>
-            <small>Show a reminder over the watch page.</small>
+            <small>
+              Show manual reminders over the watch page. Automatic updates always show a brief
+              confirmation.
+            </small>
           </span>
           <input
             id="show-prompts"
