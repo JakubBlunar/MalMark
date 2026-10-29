@@ -32,6 +32,22 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 describe('recoverable content connection', () => {
+  it('recovers if an initialization message never settles', async () => {
+    mock.send.mockImplementationOnce(() => new Promise(() => {}));
+    await import('../src/content/index');
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(
+      mock.send.mock.calls.filter(([message]) => message.type === 'GET_SITE_CONFIG').length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(mock.send.mock.calls.some(([message]) => message.type === 'PLAYBACK')).toBe(true);
+  });
+  it('resamples immediately on a background health check without waiting for video events', async () => {
+    await import('../src/content/index');
+    await vi.advanceTimersByTimeAsync(6000);
+    mock.send.mockClear();
+    await mock.add.mock.calls.at(-1)![0]({ type: 'PING_PLAYER' });
+    expect(mock.send.mock.calls.some(([message]) => message.type === 'PLAYBACK')).toBe(true);
+  });
   it('retries initialization after a missing background receiver and reconnects playback', async () => {
     mock.send.mockRejectedValueOnce(
       new Error('Could not establish connection. Receiving end does not exist.'),

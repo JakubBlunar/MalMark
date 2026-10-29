@@ -1,0 +1,23 @@
+Keep your anime watching and MyAnimeList progress together.
+
+Malmark detects the anime and episode on Crunchyroll, tracks watched sections, and asks before updating your list. Keep its sidebar open beside your video or use the popup.
+
+Features
+• Crunchyroll detection, manual anime matching and episode offsets.
+• Watched progress that accounts for speed changes and skipped sections.
+• Partial progress saved across browser restarts, with automatic cleanup after 30 days and a 100-episode limit.
+• Episode reminders that stay queued after autoplay.
+• Manual watched-count controls.
+• Optional completion and scoring for Finished Airing anime after the last episode.
+• A selector picker for other HTTPS websites you choose to add, with access granted per domain.
+
+Every list change needs your approval. Store users sign in through MyAnimeList without creating an API application.
+
+Data and permissions
+Malmark reads anime titles, episode labels and accessible player timing on supported or explicitly permitted pages. Titles and searches go to MAL for matching. Login requests, tokens and approved list changes are sent to MAL. Account tokens, selectors, saved matches and playback checkpoints remain in local extension storage. There is no Malmark backend, analytics or advertising. The privacy policy describes retention and removal.
+
+A MyAnimeList account and access to streaming content are required. Crunchyroll may require a subscription. Other sites need manual setup and may not work with every player. Netflix is not built in. Malmark supplies no streaming content and does not download video.
+
+For desktop Firefox 140 or later. Independent project; not affiliated with MyAnimeList or Crunchyroll. Source available under Elastic License 2.0; dependency licenses are retained.
+
+Support: https://github.com/JakubBlunar/MalMark/issues

@@ -4,14 +4,14 @@ import { mkdir, readFile, cp, writeFile, rm } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
 import sharp from 'sharp';
 import { thirdPartyNotices } from './licenses.mjs';
+import { buildConfig } from './build-config.mjs';
 
 const env = loadEnv('production', process.cwd(), 'VITE_');
-const distribution = process.argv.includes('--store') ? 'store' : 'unpacked';
-const clientId = distribution === 'store' ? env.VITE_MAL_CLIENT_ID?.trim() || '' : '';
-if (distribution === 'store' && !/^[a-zA-Z0-9_-]{8,128}$/.test(clientId))
-  throw new Error(
-    'Store builds require VITE_MAL_CLIENT_ID in .env (public app ID, never a secret).',
-  );
+const configFlag = process.argv.indexOf('--public-config');
+const supplied =
+  configFlag < 0 ? undefined : JSON.parse(await readFile(process.argv[configFlag + 1], 'utf8'));
+const configuration = buildConfig(process.argv.includes('--store'), env, supplied);
+const { distribution, clientId, chromiumPublicKey } = configuration;
 const define = {
   'import.meta.env.VITE_MAL_CLIENT_ID': JSON.stringify(clientId),
   'import.meta.env.VITE_DISTRIBUTION': JSON.stringify(distribution),
@@ -46,12 +46,12 @@ for (const id of Object.keys(scripts.metafile.inputs)) bundledInputs.add(id);
 const notices = await thirdPartyNotices([...bundledInputs]);
 const sites = ['https://*.crunchyroll.com/*', 'https://crunchyroll.com/*'];
 const { version } = JSON.parse(await readFile('package.json', 'utf8'));
+const listing = JSON.parse(await readFile('store/listing.json', 'utf8'));
 const base = {
   manifest_version: 3,
-  name: 'Malmark — MyAnimeList episode tracker',
+  name: listing.name,
   version,
-  description:
-    'Track anime on Crunchyroll and confirm MyAnimeList updates. Add other websites yourself with the element picker.',
+  description: listing.shortDescription,
   permissions: ['storage', 'identity', 'scripting', 'webNavigation', 'activeTab'],
   host_permissions: [...sites, 'https://api.myanimelist.net/*', 'https://myanimelist.net/*'],
   optional_host_permissions: ['https://*/*'],
@@ -107,16 +107,23 @@ for (const target of ['firefox', 'chromium']) {
           optional: [],
         },
       },
-      gecko_android: { strict_min_version: '142.0' },
     };
   } else {
+    if (chromiumPublicKey) manifest.key = chromiumPublicKey;
     manifest.minimum_chrome_version = '121';
     manifest.permissions = [...base.permissions, 'sidePanel'];
     manifest.side_panel = { default_path: 'sidebar.html' };
   }
   await writeFile(`${out}/manifest.json`, JSON.stringify(manifest, null, 2) + '\n');
-  for (const size of [16, 32, 48, 128])
-    await sharp(logo).resize(size, size).png().toFile(`${out}/icons/icon-${size}.png`);
+  for (const size of [16, 32, 48, 128]) {
+    const icon =
+      size === 128
+        ? sharp(logo)
+            .resize(96, 96)
+            .extend({ top: 16, right: 16, bottom: 16, left: 16, background: '#00000000' })
+        : sharp(logo).resize(size, size);
+    await icon.png().toFile(`${out}/icons/icon-${size}.png`);
+  }
   console.log(`Built ${out}`);
 }
-await writeFile('dist/build-info.json', JSON.stringify({ distribution }) + '\n');
+await writeFile('dist/build-info.json', JSON.stringify(configuration) + '\n');

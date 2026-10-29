@@ -3,8 +3,35 @@ import { describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
 import { bundledPackageRoots, thirdPartyNotices } from '../scripts/licenses.mjs';
 import { validateReleaseVersion } from '../scripts/release-version.mjs';
+import { generateKeyPairSync } from 'node:crypto';
+import { buildConfig, chromiumId } from '../scripts/build-config.mjs';
 
 describe('release packaging', () => {
+  it('keeps publisher configuration out of GitHub/unpacked builds', () => {
+    expect(
+      buildConfig(false, {
+        VITE_MAL_CLIENT_ID: 'public-client',
+        VITE_CHROMIUM_PUBLIC_KEY: 'invalid-ignored-key',
+      }),
+    ).toEqual({ distribution: 'unpacked', clientId: '', chromiumPublicKey: '' });
+  });
+  it('rebuilds store configuration from a public file, independently of .env', () => {
+    const { publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const key = publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
+    const supplied = { clientId: 'public-client', chromiumPublicKey: key };
+    expect(buildConfig(true, { VITE_MAL_CLIENT_ID: 'different-env-client' }, supplied)).toEqual({
+      distribution: 'store',
+      ...supplied,
+    });
+    expect(chromiumId(key)).toMatch(/^[a-p]{32}$/);
+    expect(() => buildConfig(true)).toThrow('VITE_MAL_CLIENT_ID');
+    expect(() =>
+      buildConfig(true, {
+        VITE_MAL_CLIENT_ID: 'public-client',
+        VITE_CHROMIUM_PUBLIC_KEY: 'private-or-broken-key',
+      }),
+    ).toThrow('public key');
+  });
   it('recognizes bundled scoped, nested and repeated package inputs', () => {
     const root = resolve('node_modules').replaceAll('\\', '/');
     expect(

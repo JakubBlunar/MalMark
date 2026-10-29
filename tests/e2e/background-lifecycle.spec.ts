@@ -29,6 +29,7 @@ test('Chromium package uses a native MV3 background and preserves login', async 
   expect(firefox.sidebar_action.open_at_install).toBe(false);
   expect(firefox.permissions).not.toContain('sidePanel');
   expect(firefox.side_panel).toBeUndefined();
+  expect(firefox.browser_specific_settings.gecko_android).toBeUndefined();
   const options = {
     channel: 'chromium',
     executablePath: process.env.MALMARK_BROWSER_PATH,

@@ -40,11 +40,13 @@ const mock = vi.hoisted(() => {
     },
     tabs: {
       get: vi.fn(async () => ({ id: 1, url: 'https://www.crunchyroll.com/watch/show?ep=1' })),
-      query: vi.fn(async () => []),
+      query: vi.fn(async () => [] as { id: number; url: string }[]),
       sendMessage: vi.fn(async () => undefined),
       create: vi.fn(),
       update: vi.fn(),
       onRemoved: { addListener: vi.fn() },
+      onActivated: { addListener: vi.fn() },
+      onUpdated: { addListener: vi.fn() },
     },
     identity: {
       getRedirectURL: () => 'https://test.extensions.allizom.org/',
@@ -113,6 +115,15 @@ const listener = mock.browser.runtime.onMessage.addListener.mock.calls[0][0] as 
 ) => Promise<Reply<unknown>>;
 const installed = mock.browser.runtime.onInstalled.addListener.mock
   .calls[0][0] as () => Promise<void>;
+const startupListener = mock.browser.runtime.onStartup.addListener.mock
+  .calls[0][0] as () => Promise<void>;
+const activatedListener = mock.browser.tabs.onActivated.addListener.mock.calls[0][0] as (info: {
+  tabId: number;
+}) => void;
+const updatedListener = mock.browser.tabs.onUpdated.addListener.mock.calls[0][0] as (
+  id: number,
+  info: { status: string },
+) => void;
 async function message<T = unknown>(
   value: unknown,
   sender: Record<string, unknown> = ui,
@@ -586,6 +597,71 @@ describe('finished series completion', () => {
 });
 
 describe('background consent boundary', () => {
+  it('reconnects existing watch tabs on browser startup', async () => {
+    mock.browser.permissions.contains.mockResolvedValue(true);
+    mock.browser.tabs.query.mockResolvedValueOnce([{ id: 57, url: content.url }]);
+    mock.browser.scripting.executeScript.mockClear();
+    await startupListener();
+    expect(mock.browser.scripting.executeScript).toHaveBeenCalledWith({
+      target: { tabId: 57, frameIds: [0] },
+      files: ['content.js'],
+    });
+  });
+  it('retries when a restored tab finishes loading or becomes active', async () => {
+    mock.browser.permissions.contains.mockResolvedValue(true);
+    mock.browser.scripting.executeScript.mockClear();
+    activatedListener({ tabId: 58 });
+    updatedListener(59, { status: 'complete' });
+    await vi.waitFor(() => {
+      expect(mock.browser.scripting.executeScript).toHaveBeenCalledWith({
+        target: { tabId: 58, frameIds: [0] },
+        files: ['content.js'],
+      });
+      expect(mock.browser.scripting.executeScript).toHaveBeenCalledWith({
+        target: { tabId: 59, frameIds: [0] },
+        files: ['content.js'],
+      });
+    });
+  });
+  it('distinguishes a match from live playback on the badge', async () => {
+    const s = session();
+    await mock.browser.storage.session.set({ 'tab:55': s });
+    await message({ type: 'GET_STATE', tabId: 55 });
+    expect(mock.browser.action.setBadgeText).toHaveBeenLastCalledWith({ tabId: 55, text: '…' });
+    s.progress.last = {
+      videoId: 'current',
+      currentTime: 10,
+      duration: 1000,
+      paused: false,
+      ended: false,
+      rate: 1,
+      sentAt: Date.now(),
+    };
+    await mock.browser.storage.session.set({ 'tab:55': s });
+    await message({ type: 'GET_STATE', tabId: 55 });
+    expect(mock.browser.action.setBadgeText).toHaveBeenLastCalledWith({ tabId: 55, text: '✓' });
+    s.progress.last.sentAt -= 20000;
+    await mock.browser.storage.session.set({ 'tab:55': s });
+    await message({ type: 'GET_STATE', tabId: 55 });
+    expect(mock.browser.action.setBadgeText).toHaveBeenLastCalledWith({ tabId: 55, text: '…' });
+  });
+  it('reconnects a missing tracker when the popup reads state, without a MAL refresh', async () => {
+    mock.browser.permissions.contains.mockResolvedValue(true);
+    mock.browser.scripting.executeScript.mockClear();
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    await message({ type: 'GET_STATE', tabId: 56 });
+    await vi.waitFor(() =>
+      expect(mock.browser.scripting.executeScript).toHaveBeenCalledWith({
+        target: { tabId: 56, frameIds: [0] },
+        files: ['content.js'],
+      }),
+    );
+    mock.browser.scripting.executeScript.mockClear();
+    await message({ type: 'GET_STATE', tabId: 56 });
+    expect(mock.browser.scripting.executeScript).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it('restores a checkpoint through detection after all tab sessions are lost', async () => {
     const previous = session();
     previous.progress = { ranges: [[0, 100]], watched: 100, position: 100, duration: 1000 };

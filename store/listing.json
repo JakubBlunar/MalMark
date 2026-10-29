@@ -1,0 +1,11 @@
+{
+  "name": "Malmark — MyAnimeList episode tracker",
+  "shortDescription": "Track anime on Crunchyroll and confirm MyAnimeList updates. Add other websites yourself with the element picker.",
+  "firefoxSummary": "Keep your MyAnimeList progress in step with Crunchyroll. Review episode updates in a sidebar, match seasons manually, and optionally add your own websites.",
+  "language": "en",
+  "homepage": "https://github.com/JakubBlunar/MalMark",
+  "support": "https://github.com/JakubBlunar/MalMark/issues",
+  "privacy": "https://github.com/JakubBlunar/MalMark/blob/main/PRIVACY.md",
+  "singlePurpose": "Help users track anime episodes they watch and approve updates to their own MyAnimeList list.",
+  "firefoxTags": ["anime", "myanimelist", "crunchyroll", "tracking", "sidebar"]
+}

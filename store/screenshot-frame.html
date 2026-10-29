@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      width: 1280px;
+      height: 800px;
+      overflow: hidden;
+      background: #101218;
+      color: #f4f1ff;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    .halo {
+      position: absolute;
+      width: 850px;
+      height: 850px;
+      right: -120px;
+      top: -60px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #60508045, transparent 67%);
+    }
+    .grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(#c5afff05 1px, transparent 1px),
+        linear-gradient(90deg, #c5afff05 1px, transparent 1px);
+      background-size: 64px 64px;
+    }
+    .brand {
+      position: absolute;
+      left: 76px;
+      top: 66px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      font-size: 28px;
+      font-weight: 650;
+      letter-spacing: -1px;
+    }
+    .brand img {
+      width: 46px;
+      height: 46px;
+    }
+    .copy {
+      position: absolute;
+      left: 76px;
+      top: 224px;
+      width: 565px;
+    }
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 2.7px;
+      color: #ac9be9;
+      font-weight: 650;
+    }
+    .copy h1 {
+      font-size: 65px;
+      line-height: 1.07;
+      letter-spacing: -2.8px;
+      font-weight: 650;
+      margin: 23px 0;
+    }
+    .copy p {
+      font-size: 20px;
+      line-height: 1.6;
+      color: #a8afc0;
+      max-width: 480px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: #b7e8cf;
+      font-size: 13px;
+      margin-top: 28px;
+    }
+    .pill:before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #8ae2bd;
+    }
+    .screen {
+      position: absolute;
+      left: 750px;
+      top: 46px;
+      width: 422px;
+      height: 706px;
+      border: 1px solid #625871;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 25px 90px #0006;
+      background: #101218;
+    }
+    .screen img {
+      display: block;
+      width: 420px;
+      height: 704px;
+      object-fit: cover;
+      object-position: top;
+    }
+    .footer {
+      position: absolute;
+      left: 76px;
+      bottom: 63px;
+      color: #71788c;
+      font-size: 12px;
+      letter-spacing: 0.3px;
+    }
+    .sample {
+      position: absolute;
+      right: 106px;
+      bottom: 21px;
+      color: #9298a9;
+      font-size: 11px;
+    }
+  </style>
+  <body>
+    <div class="halo"></div>
+    <div class="grid"></div>
+    <div class="brand"><img src="{{LOGO}}" alt="" />Malmark</div>
+    <div class="copy">
+      <div class="eyebrow">{{EYEBROW}}</div>
+      <h1>{{TITLE}}</h1>
+      <p>{{DESCRIPTION}}</p>
+      <div class="pill">{{DETAIL}}</div>
+    </div>
+    <div class="screen"><img src="{{SCREEN}}" alt="" /></div>
+    <div class="footer">WATCH. ENJOY. REMEMBER.</div>
+    <div class="sample">Sample data · Actual Malmark interface</div>
+  </body>
+</html>

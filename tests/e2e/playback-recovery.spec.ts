@@ -1,5 +1,5 @@
 import { chromium, expect, test, type BrowserContext, type Worker } from '@playwright/test';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
 
 async function fixtures(context: BrowserContext, worker: Worker, authenticate = false) {
@@ -58,12 +58,10 @@ const session = (worker: Worker, tabId: number) =>
     async (id) => (await (globalThis as any).chrome.storage.session.get(`tab:${id}`))[`tab:${id}`],
     tabId,
   );
-const watchTab = (worker: Worker) =>
+const watchTab = (worker: Worker, url = 'https://www.crunchyroll.com/watch/*') =>
   worker.evaluate(
-    async () =>
-      (
-        await (globalThis as any).chrome.tabs.query({ url: 'https://www.crunchyroll.com/watch/*' })
-      )[0].id as number,
+    async (url) => (await (globalThis as any).chrome.tabs.query({ url }))[0].id as number,
+    url,
   );
 
 test('watched ranges survive closing the browser and resume without counting a seek or offline time', async () => {
@@ -106,6 +104,9 @@ test('watched ranges survive closing the browser and resume without counting a s
     context = await chromium.launchPersistentContext(profile, options);
     worker = context.serviceWorkers()[0] || (await context.waitForEvent('serviceworker'));
     await fixtures(context, worker);
+    const historyAtRestart = await worker.evaluate(
+      async () => (await (globalThis as any).chrome.storage.local.get('watchHistory')).watchHistory,
+    );
     expect(
       await worker.evaluate(async () =>
         Object.values(await (globalThis as any).chrome.storage.session.get(null)).some(
@@ -115,8 +116,31 @@ test('watched ranges survive closing the browser and resume without counting a s
     ).toBe(false);
     page = await context.newPage();
     await page.goto('https://www.crunchyroll.com/watch/EP2/episode?resume=true');
-    tabId = await watchTab(worker);
-    await expect.poll(async () => (await session(worker, tabId))?.progress?.watched).toBe(20);
+    tabId = await watchTab(worker, page.url());
+    try {
+      await expect.poll(async () => (await session(worker, tabId))?.progress?.watched).toBe(20);
+    } catch (error) {
+      const debug = {
+        historyAtRestart,
+        state: await worker.evaluate(async () => {
+          const api = (globalThis as any).chrome;
+          return {
+            history: (await api.storage.local.get('watchHistory')).watchHistory,
+            account: (await api.storage.local.get('auth')).auth?.profile?.id,
+            sessions: await api.storage.session.get(null),
+            tabs: (await api.tabs.query({ url: 'https://www.crunchyroll.com/watch/*' })).map(
+              (tab: any) => ({ id: tab.id, url: tab.url }),
+            ),
+          };
+        }),
+      };
+      await writeFile('artifacts/restart-state.json', JSON.stringify(debug, null, 2));
+      await test.info().attach('restart-state', {
+        contentType: 'application/json',
+        body: JSON.stringify(debug, null, 2),
+      });
+      throw error;
+    }
     expect((await session(worker, tabId)).playerConnected).toBe(false);
     await sample(worker, tabId, 700);
     await expect.poll(async () => (await session(worker, tabId))?.progress?.position).toBe(700);
@@ -133,6 +157,86 @@ test('watched ranges survive closing the browser and resume without counting a s
   } finally {
     await context.close();
     if (!profile.startsWith(root + sep)) throw new Error('Unsafe test profile path');
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
+test('opening Malmark reconnects a missing tracker on an already matched autoplaying tab without reloading it', async () => {
+  test.setTimeout(30000);
+  const root = resolve('artifacts');
+  await mkdir(root, { recursive: true });
+  const profile = await mkdtemp(resolve(root, 'popup-recovery-'));
+  const extension = resolve('dist/chromium');
+  const context = await chromium.launchPersistentContext(profile, {
+    channel: 'chromium',
+    headless: true,
+    executablePath: process.env.MALMARK_BROWSER_PATH,
+    args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
+  });
+  try {
+    const worker = context.serviceWorkers()[0] || (await context.waitForEvent('serviceworker'));
+    await fixtures(context, worker, true);
+    const page = await context.newPage();
+    await page.goto('https://www.crunchyroll.com/watch/EP2/episode');
+    const tabId = await watchTab(worker, page.url());
+    await expect.poll(async () => (await session(worker, tabId))?.anime?.id).toBe(1);
+    await worker.evaluate(async (tabId) => {
+      const api = (globalThis as any).chrome;
+      await api.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          window.__malmarkController?.stop();
+          (window as any).sameWatchDocument = true;
+          const video = document.querySelector('video')!;
+          Object.defineProperties(video, {
+            currentTime: { value: 100, configurable: true },
+            duration: { value: 1000, configurable: true },
+            paused: { value: false, configurable: true },
+          });
+        },
+      });
+      // Reproduce the old green match badge with a missing playback tracker.
+      await api.action.setBadgeText({ tabId, text: '✓' });
+    }, tabId);
+    const popup = await context.newPage();
+    await popup.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html?tab=${tabId}`);
+    await expect(popup.locator('.quiet-tag')).toContainText('Waiting for player');
+    await expect
+      .poll(() =>
+        worker.evaluate(
+          async (tabId) => (globalThis as any).chrome.action.getBadgeText({ tabId }),
+          tabId,
+        ),
+      )
+      .toBe('…');
+    await expect
+      .poll(async () => (await session(worker, tabId))?.playerConnected, { timeout: 10000 })
+      .toBe(true);
+    await expect(popup.locator('.quiet-tag')).toContainText('Player connected');
+    await expect
+      .poll(() =>
+        worker.evaluate(
+          async (tabId) => (globalThis as any).chrome.action.getBadgeText({ tabId }),
+          tabId,
+        ),
+      )
+      .toBe('✓');
+    expect((await session(worker, tabId)).progress.watched).toBe(0);
+    expect(
+      await worker.evaluate(
+        async (tabId) =>
+          (
+            await (globalThis as any).chrome.scripting.executeScript({
+              target: { tabId },
+              func: () => (window as any).sameWatchDocument,
+            })
+          )[0].result,
+        tabId,
+      ),
+    ).toBe(true);
+  } finally {
+    await context.close();
+    if (!profile.startsWith(root + sep)) throw new Error('Unsafe recovery profile');
     await rm(profile, { recursive: true, force: true });
   }
 });

@@ -6,6 +6,7 @@ A browser extension for Chrome, Brave and Firefox that detects the anime you’r
 - A persistent sidebar, popup, profile, and watch settings.
 - Playback tracking that accounts for speed changes and skipped scenes.
 - Partial episode progress survives browser restarts; old checkpoints expire after 30 days (100 episodes maximum).
+- Restored/activated tabs and opening Malmark retry tracker connections. The badge shows ✓ for a match with recent player data, or … while waiting for the player.
 - Manual watched-count controls and reminders that survive autoplay.
 - Complete and optionally score finished-airing anime after the final episode.
 - A selector picker for websites you choose to add, with permission per domain.
@@ -44,6 +45,8 @@ Default builds and GitHub release ZIPs use each user’s own public client ID, e
 For local store submissions, copy `.env.example` to `.env`, set `VITE_MAL_CLIENT_ID` for your public MAL app of type **Other**, and run `npm run package:store`. This creates `artifacts/malmark-store-chromium.zip` and `malmark-store-firefox.zip` with direct sign-in. Finalize the store extension identity and register its callback before publishing. Never include a client secret. `npm run build:store` builds the same profile without ZIPs.
 
 ## Releases
+
+Store listing copy, image generation, privacy declarations and the submission checklist are in [store/README.md](store/README.md).
 
 Push a version tag matching `package.json`, such as `v0.1.0`. After checks pass, GitHub Actions publishes a Release with `malmark-chromium.zip` and `malmark-firefox.zip`, both using API setup. Pull requests run checks only; ordinary pushes to `main` do not publish or upload packages. The ZIPs are unsigned; Firefox requires signing for permanent installation. Store bundles are built locally with `npm run package:store`.
 

@@ -15,8 +15,17 @@ function start(): { stop: () => void } | undefined {
   let valid = true;
   async function sendReply<T>(message: Message): Promise<Reply<T> | undefined> {
     if (!valid) return;
+    let timer: number | undefined;
     try {
-      const reply = (await browser.runtime.sendMessage(message)) as Reply<T>;
+      const reply = (await Promise.race([
+        browser.runtime.sendMessage(message),
+        new Promise((_, reject) => {
+          timer = window.setTimeout(
+            () => reject(new Error('Background response timed out.')),
+            message.type === 'DETECTION' ? 45000 : 5000,
+          );
+        }),
+      ])) as Reply<T>;
       return reply;
     } catch (error) {
       // Worker startup and a temporarily missing receiver are recoverable.
@@ -26,6 +35,8 @@ function start(): { stop: () => void } | undefined {
         )
       )
         stop();
+    } finally {
+      window.clearTimeout(timer);
     }
   }
   async function send<T>(message: Message): Promise<T | undefined> {
@@ -187,7 +198,14 @@ function start(): { stop: () => void } | undefined {
   });
   const listener = (message: unknown) => {
     if (!message || typeof message !== 'object' || !('type' in message)) return false;
-    if (message.type === 'PING_PLAYER') return Promise.resolve({ ready: valid });
+    if (message.type === 'PING_PLAYER') {
+      if (valid) {
+        players.scan(true);
+        if (!configReady) void loadConfig();
+        else void scanPage();
+      }
+      return Promise.resolve({ ready: valid });
+    }
     if (message.type === 'REDETECT') {
       lastDetection = '';
       void scanPage(true);

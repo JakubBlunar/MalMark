@@ -52,19 +52,21 @@ function samePage(a: string, b: string): boolean {
 
 async function badge(tabId: number, session?: WatchSession): Promise<void> {
   const pending = (await getPending()).some((p) => p.tabId === tabId);
-  const text = pending ? '!' : session?.match === 'matched' ? '✓' : session ? '?' : '';
+  const matched = session?.match === 'matched';
+  const connected = !!session?.progress.last && Date.now() - session.progress.last.sentAt < 15000;
+  const text = pending ? '!' : matched ? (connected ? '✓' : '…') : session ? '?' : '';
   await Promise.all([
     browser.action.setBadgeText({ tabId, text }),
     browser.action.setBadgeBackgroundColor({
       tabId,
-      color: pending ? '#efb75e' : session?.match === 'matched' ? '#75dfb5' : '#8d83f3',
+      color: pending || (matched && !connected) ? '#efb75e' : matched ? '#75dfb5' : '#8d83f3',
     }),
     browser.action.setTitle({
       tabId,
       title: pending
         ? 'Malmark · Confirm episode update'
         : session?.anime
-          ? `Malmark · ${session.anime.title}`
+          ? `Malmark · ${session.anime.title} · ${connected ? 'Player connected' : 'Waiting for player'}`
           : 'Malmark · Find your anime',
     }),
   ]).catch(() => undefined);
@@ -252,6 +254,36 @@ async function playbackMessage(
   await saveWatchProgress(session);
   await setSession(tabId, session);
   await completed(tabId, session);
+  await badge(tabId, session);
+}
+
+const recovery = new Map<number, { attemptedAt: number; task?: Promise<void> }>();
+function recoverPlayer(tabId: number): Promise<void> {
+  const previous = recovery.get(tabId);
+  if (previous?.task) return previous.task;
+  if (previous && Date.now() - previous.attemptedAt < 5000) return Promise.resolve();
+  const entry: { attemptedAt: number; task?: Promise<void> } = { attemptedAt: Date.now() };
+  recovery.set(tabId, entry);
+  entry.task = injectPlayers(tabId)
+    .catch(() => undefined)
+    .finally(() => {
+      entry.task = undefined;
+    });
+  return entry.task;
+}
+
+async function bounded<T>(task: Promise<T>): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      task,
+      new Promise<undefined>((resolve) => {
+        timer = setTimeout(() => resolve(undefined), 1500);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function injectPlayers(tabId: number): Promise<void> {
@@ -270,14 +302,18 @@ async function injectPlayers(tabId: number): Promise<void> {
           return;
         }
         if (await browser.permissions.contains({ origins: [origin + '/*'] })) {
-          const health = (await browser.tabs
-            .sendMessage(tabId, { type: 'PING_PLAYER' }, { frameId: frame.frameId })
-            .catch(() => undefined)) as { ready?: boolean } | undefined;
+          const health = (await bounded(
+            browser.tabs
+              .sendMessage(tabId, { type: 'PING_PLAYER' }, { frameId: frame.frameId })
+              .catch(() => undefined),
+          )) as { ready?: boolean } | undefined;
           if (health?.ready) return;
-          await browser.scripting.executeScript({
-            target: { tabId, frameIds: [frame.frameId] },
-            files: ['content.js'],
-          });
+          await bounded(
+            browser.scripting.executeScript({
+              target: { tabId, frameIds: [frame.frameId] },
+              files: ['content.js'],
+            }),
+          );
         }
       },
     ),
@@ -300,6 +336,10 @@ async function snapshot(tabId?: number): Promise<PublicState> {
     tabId !== undefined && tab?.url && (await supportedUrl(tab.url))
       ? await getSession(tabId)
       : undefined;
+  if (tabId !== undefined && tab?.url && (await supportedUrl(tab.url))) {
+    void recoverPlayer(tabId);
+    await badge(tabId, session);
+  }
   if (session)
     session.playerConnected =
       !!session.progress.last && Date.now() - session.progress.last.sentAt < 15000;
@@ -831,6 +871,7 @@ browser.runtime.onMessage.addListener((raw: unknown, sender: browser.Runtime.Mes
 });
 
 browser.tabs.onRemoved.addListener((tabId) => {
+  recovery.delete(tabId);
   void serialized(() => browser.storage.session.remove(`tab:${tabId}`));
 });
 
@@ -873,4 +914,17 @@ browser.runtime.onInstalled.addListener(async () => {
   );
 });
 
-browser.runtime.onStartup.addListener(() => serialized(pruneWatchHistory));
+browser.tabs.onActivated.addListener(({ tabId }) => {
+  void recoverPlayer(tabId);
+});
+browser.tabs.onUpdated.addListener((tabId, change) => {
+  if (change.status === 'complete') void recoverPlayer(tabId);
+});
+browser.runtime.onStartup.addListener(async () => {
+  await serialized(pruneWatchHistory);
+  await Promise.allSettled(
+    (await browser.tabs.query({})).flatMap((tab) =>
+      tab.id === undefined ? [] : [recoverPlayer(tab.id)],
+    ),
+  );
+});

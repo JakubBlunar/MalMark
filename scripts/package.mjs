@@ -1,8 +1,10 @@
 import { zipSync } from 'fflate';
 import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { reviewerSource } from './reviewer-source.mjs';
 await mkdir('artifacts', { recursive: true });
-const { distribution } = JSON.parse(await readFile('dist/build-info.json', 'utf8'));
+const configuration = JSON.parse(await readFile('dist/build-info.json', 'utf8'));
+const { distribution } = configuration;
 if (!['store', 'unpacked'].includes(distribution)) throw new Error('Unknown build distribution.');
 const prefix = distribution === 'store' ? 'malmark-store' : 'malmark';
 for (const target of ['firefox', 'chromium']) {
@@ -17,3 +19,4 @@ for (const target of ['firefox', 'chromium']) {
   await writeFile(`artifacts/${prefix}-${target}.zip`, zipSync(files));
   console.log(`Packaged artifacts/${prefix}-${target}.zip`);
 }
+if (distribution === 'store') await reviewerSource(configuration);

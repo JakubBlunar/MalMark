@@ -22,7 +22,11 @@ export function WatchingView({
         <span className="eyebrow">YOUR WATCH COMPANION</span>
         <span className="quiet-tag">
           <i className={s?.playerConnected ? 'pulse' : ''} />
-          {s?.playerConnected ? 'Player connected' : 'Ready when you are'}
+          {s?.playerConnected
+            ? 'Player connected'
+            : s
+              ? 'Waiting for player'
+              : 'Ready when you are'}
         </span>
       </div>
       {!state.connected ? (
