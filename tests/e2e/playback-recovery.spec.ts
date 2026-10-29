@@ -2,34 +2,42 @@ import { chromium, expect, test, type BrowserContext, type Worker } from '@playw
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
 
-async function fixtures(context: BrowserContext, worker: Worker, authenticate = false) {
+async function fixtures(
+  context: BrowserContext,
+  worker: Worker,
+  authenticate = false,
+  watched = 1,
+) {
   await context.route('https://www.crunchyroll.com/watch/**', (route) =>
     route.fulfill({
       contentType: 'text/html',
       body: '<html><head><title>Season 1 - Watch on Crunchyroll</title></head><body><a href="/series/SHOW/a-show">A Show</a><h1>Episode 2</h1><video style="width:640px;height:360px"></video></body></html>',
     }),
   );
-  await worker.evaluate(async (authenticate) => {
-    const root = globalThis as any;
-    const anime = {
-      id: 1,
-      title: 'A Show',
-      num_episodes: 12,
-      my_list_status: { status: 'watching', num_episodes_watched: 1 },
-    };
-    root.fetch = async (url: string) =>
-      new Response(JSON.stringify(url.includes('/anime?') ? { data: [{ node: anime }] } : anime));
-    if (authenticate)
-      await root.chrome.storage.local.set({
-        auth: {
-          accessToken: 'fixture',
-          refreshToken: 'fixture',
-          expiresAt: Date.now() + 3600000,
-          clientId: 'fixture',
-          profile: { id: 5, name: 'fixture-user' },
-        },
-      });
-  }, authenticate);
+  await worker.evaluate(
+    async ({ authenticate, watched }) => {
+      const root = globalThis as any;
+      const anime = {
+        id: 1,
+        title: 'A Show',
+        num_episodes: 12,
+        my_list_status: { status: 'watching', num_episodes_watched: watched },
+      };
+      root.fetch = async (url: string) =>
+        new Response(JSON.stringify(url.includes('/anime?') ? { data: [{ node: anime }] } : anime));
+      if (authenticate)
+        await root.chrome.storage.local.set({
+          auth: {
+            accessToken: 'fixture',
+            refreshToken: 'fixture',
+            expiresAt: Date.now() + 3600000,
+            clientId: 'fixture',
+            profile: { id: 5, name: 'fixture-user' },
+          },
+        });
+    },
+    { authenticate, watched },
+  );
 }
 async function sample(worker: Worker, tabId: number, time: number) {
   await worker.evaluate(
@@ -63,6 +71,70 @@ const watchTab = (worker: Worker, url = 'https://www.crunchyroll.com/watch/*') =
     async (url) => (await (globalThis as any).chrome.tabs.query({ url }))[0].id as number,
     url,
   );
+
+test('refresh retains 2% watched for an episode already logged on MAL and resumes without crediting the seek', async () => {
+  test.setTimeout(45000);
+  const root = resolve('artifacts');
+  await mkdir(root, { recursive: true });
+  const profile = await mkdtemp(resolve(root, 'logged-refresh-profile-'));
+  const extension = resolve('dist/chromium');
+  const nativeChrome = !!process.env.MALMARK_CHROME_PATH;
+  const context = await chromium.launchPersistentContext(profile, {
+    channel: nativeChrome ? undefined : 'chromium',
+    headless: true,
+    executablePath: nativeChrome
+      ? process.env.MALMARK_CHROME_PATH
+      : process.env.MALMARK_BROWSER_PATH,
+    ignoreDefaultArgs: nativeChrome ? ['--disable-extensions'] : undefined,
+    args: nativeChrome
+      ? ['--enable-unsafe-extension-debugging']
+      : [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
+  });
+  try {
+    if (nativeChrome) {
+      const cdp = await context.browser()!.newBrowserCDPSession();
+      await cdp.send('Extensions.loadUnpacked', { path: extension });
+    }
+    const worker = context.serviceWorkers()[0] || (await context.waitForEvent('serviceworker'));
+    await fixtures(context, worker, true, 2);
+    await worker.evaluate(() => {
+      const root = globalThis as any;
+      root.testTime = Date.now() - 60000;
+      Date.now = () => root.testTime;
+    });
+    const page = await context.newPage();
+    await page.goto('https://www.crunchyroll.com/watch/GE00374388JAJP/the-hero-awakens');
+    const tabId = await watchTab(worker, page.url());
+    await expect
+      .poll(async () => (await session(worker, tabId))?.anime?.my_list_status?.num_episodes_watched)
+      .toBe(2);
+    for (const time of [0, 5, 10, 15, 20]) {
+      await sample(worker, tabId, time);
+      await expect.poll(async () => (await session(worker, tabId))?.progress?.watched).toBe(time);
+    }
+    await page.reload();
+    await expect.poll(async () => (await session(worker, tabId))?.progress?.watched).toBe(20);
+    await sample(worker, tabId, 200);
+    await expect.poll(async () => (await session(worker, tabId))?.progress?.position).toBe(200);
+    expect((await session(worker, tabId)).progress.watched).toBe(20);
+    const popup = await context.newPage();
+    await popup.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html?tab=${tabId}`);
+    await expect(popup.locator('.progress-label b')).toHaveText('2%');
+    await sample(worker, tabId, 205);
+    await expect.poll(async () => (await session(worker, tabId))?.progress?.watched).toBe(25);
+    await page.reload();
+    await expect.poll(async () => (await session(worker, tabId))?.progress?.watched).toBe(25);
+    expect(
+      await worker.evaluate(
+        async () => (await (globalThis as any).chrome.storage.local.get('pending')).pending ?? [],
+      ),
+    ).toEqual([]);
+  } finally {
+    await context.close();
+    if (!profile.startsWith(root + sep)) throw new Error('Unsafe refresh test profile path');
+    await rm(profile, { recursive: true, force: true });
+  }
+});
 
 test('watched ranges survive closing the browser and resume without counting a seek or offline time', async () => {
   test.setTimeout(60000);

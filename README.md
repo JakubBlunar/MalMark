@@ -5,7 +5,7 @@ A browser extension for Chrome, Brave and Firefox that detects the anime you’r
 - Crunchyroll support built in, with manual matching and episode offsets.
 - A persistent sidebar, popup, profile, and watch settings.
 - Playback tracking that accounts for speed changes and skipped scenes.
-- Partial episode progress survives browser restarts; old checkpoints expire after 30 days (100 episodes maximum).
+- Partial episode progress survives page refreshes and browser restarts, including episodes already logged on MAL; old checkpoints expire after 30 days (100 episodes maximum).
 - Restored/activated tabs and opening Malmark retry tracker connections. The badge shows ✓ for a match with recent player data, or … while waiting for the player.
 - Manual watched-count controls and reminders that survive autoplay.
 - Complete and optionally score finished-airing anime after the final episode.

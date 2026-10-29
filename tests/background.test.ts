@@ -597,6 +597,61 @@ describe('finished series completion', () => {
 });
 
 describe('background consent boundary', () => {
+  it.each([false, true])(
+    'restores logged-episode playback after refresh without another MAL update (rewatching: %s)',
+    async (rewatching) => {
+      const previous = session();
+      previous.anime = {
+        ...anime,
+        my_list_status: {
+          ...anime.my_list_status!,
+          num_episodes_watched: 2,
+          is_rewatching: rewatching,
+        },
+      };
+      previous.progress = { ranges: [[0, 20]], watched: 20, position: 20, duration: 1000 };
+      await saveWatchProgress(previous);
+      const fetch = vi
+        .fn()
+        .mockImplementation(async () =>
+          json({ data: [{ node: previous.anime }], ...previous.anime }),
+        );
+      vi.stubGlobal('fetch', fetch);
+      const redetect = () =>
+        message(
+          { type: 'DETECTION', detection, pageUrl: detection.url, frameOrigins: [] },
+          content,
+        );
+      expect((await redetect()).ok).toBe(true);
+      expect((mock.getSession()['tab:1'] as WatchSession).progress.watched).toBe(20);
+      expect((await redetect()).ok).toBe(true);
+      expect((mock.getLocal().watchHistory as any[])[0].progress.watched).toBe(20);
+      // Crossing the prompt threshold while replaying never logs an already watched episode.
+      const restored = mock.getSession()['tab:1'] as WatchSession;
+      restored.progress = { ranges: [[0, 900]], watched: 900, position: 900, duration: 1000 };
+      await mock.browser.storage.session.set({ 'tab:1': restored });
+      await message(
+        {
+          type: 'PLAYBACK',
+          pageUrl: content.url,
+          playback: {
+            videoId: 'replay',
+            currentTime: 900,
+            duration: 1000,
+            paused: false,
+            ended: false,
+            rate: 1,
+            sentAt: Date.now(),
+          },
+        },
+        content,
+      );
+      expect(mock.getLocal().pending ?? []).toEqual([]);
+      expect(
+        fetch.mock.calls.every(([, options]) => !options?.method || options.method === 'GET'),
+      ).toBe(true);
+    },
+  );
   it('reconnects existing watch tabs on browser startup', async () => {
     mock.browser.permissions.contains.mockResolvedValue(true);
     mock.browser.tabs.query.mockResolvedValueOnce([{ id: 57, url: content.url }]);

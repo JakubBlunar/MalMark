@@ -15,7 +15,6 @@ vi.mock('webextension-polyfill', () => ({
   },
 }));
 import {
-  clearWatchedProgress,
   discardWatchProgress,
   HISTORY_LIMIT,
   HISTORY_TTL,
@@ -130,19 +129,26 @@ describe('durable episode progress', () => {
     ]);
     expect((await restoreWatchProgress(next)).watched).toBe(210);
   });
-  it('does not restore different-duration media or keep already logged episodes', async () => {
+  it('does not combine different-duration media', async () => {
     await saveWatchProgress(session());
     const next = session();
     next.progress = { ranges: [], watched: 0, position: 0, duration: 1200 };
     await saveWatchProgress(next);
     expect((await restoreWatchProgress(next)).watched).toBe(0);
-    await saveWatchProgress(session());
-    await clearWatchedProgress(11, 2);
-    expect(mock.data.watchHistory).toEqual([]);
-    next.anime!.my_list_status!.num_episodes_watched = 2;
-    await saveWatchProgress(next);
-    expect(mock.data.watchHistory).toEqual([]);
   });
+  it.each([false, true])(
+    'keeps local playback for a logged episode (rewatching: %s)',
+    async (rewatching) => {
+      const next = session();
+      next.anime!.my_list_status!.num_episodes_watched = 2;
+      next.anime!.my_list_status!.is_rewatching = rewatching;
+      next.progress = { ranges: [[0, 20]], watched: 20, position: 20, duration: 1000 };
+      await saveWatchProgress(next);
+      expect(await restoreWatchProgress(next)).toEqual(next.progress);
+      next.anime!.my_list_status!.num_episodes_watched = 12;
+      expect((await restoreWatchProgress(next)).watched).toBe(20);
+    },
+  );
   it('discards corrected matches and removed website history', async () => {
     await saveWatchProgress(session());
     await discardWatchProgress(session());

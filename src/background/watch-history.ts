@@ -17,7 +17,7 @@ interface Checkpoint {
 }
 
 function identity(session: WatchSession, account: number): string | undefined {
-  if (!session.anime || !session.episode || session.anime.my_list_status?.is_rewatching) return;
+  if (!session.anime || !session.episode) return;
   return JSON.stringify([
     account,
     new URL(session.detection.url).origin,
@@ -114,10 +114,7 @@ export async function saveWatchProgress(session: WatchSession): Promise<void> {
   const entries = await history();
   const previous = entries.find((entry) => entry.key === key);
   const remaining = entries.filter((entry) => entry.key !== key);
-  if (session.episode <= (session.anime.my_list_status?.num_episodes_watched ?? -1)) {
-    if (previous) await browser.storage.local.set({ watchHistory: remaining });
-    return;
-  }
+  // Local playback coverage is independent of the episode total already logged on MAL.
   if (previous && Math.abs(previous.progress.duration - progress.duration) < 3) {
     progress = compact({ ...progress, ranges: [...previous.progress.ranges, ...progress.ranges] })!;
     session.progress = { ...session.progress, ...progress };
@@ -144,16 +141,6 @@ export async function discardWatchProgress(session: WatchSession): Promise<void>
   const key = identity(session, account);
   const entries = await history();
   await browser.storage.local.set({ watchHistory: entries.filter((entry) => entry.key !== key) });
-}
-
-export async function clearWatchedProgress(animeId: number, episode: number): Promise<void> {
-  const account = (await getAuth())?.profile?.id;
-  const entries = await history();
-  await browser.storage.local.set({
-    watchHistory: entries.filter(
-      (entry) => entry.account !== account || entry.animeId !== animeId || entry.episode > episode,
-    ),
-  });
 }
 
 export async function removeSiteProgress(origin: string): Promise<void> {

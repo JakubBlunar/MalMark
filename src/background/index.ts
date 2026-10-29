@@ -27,7 +27,6 @@ import { configForUrl, registerSite, retireLegacyAccess, supportedUrl } from './
 import { chromiumSidePanel } from '../shared/sidebar';
 import { OAUTH_SETUP_REQUIRED } from '../shared/config';
 import {
-  clearWatchedProgress,
   discardWatchProgress,
   pruneWatchHistory,
   removeSiteProgress,
@@ -129,11 +128,6 @@ async function resolve(
       session.progress = await restoreWatchProgress(session);
       session.playerConnected = false;
     }
-    if (session.anime?.my_list_status)
-      await clearWatchedProgress(
-        session.anime.id,
-        session.anime.my_list_status.num_episodes_watched,
-      );
   } catch (e) {
     session.error = errorText(e);
   }
@@ -402,8 +396,6 @@ async function resolvePending(item: PendingUpdate): Promise<void> {
 }
 
 async function refreshAnimeSessions(anime: Anime): Promise<void> {
-  if (anime.my_list_status)
-    await clearWatchedProgress(anime.id, anime.my_list_status.num_episodes_watched);
   const entries = await browser.storage.session.get(null);
   for (const [key, value] of Object.entries(entries)) {
     const session = value as WatchSession;
