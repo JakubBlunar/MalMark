@@ -72,6 +72,148 @@ const watchTab = (worker: Worker, url = 'https://www.crunchyroll.com/watch/*') =
     url,
   );
 
+test('saving a manual match reconnects a missing embedded tracker without reloading the episode', async () => {
+  test.setTimeout(30000);
+  const root = resolve('artifacts');
+  await mkdir(root, { recursive: true });
+  const profile = await mkdtemp(resolve(root, 'manual-match-recovery-'));
+  const extension = resolve('dist/chromium');
+  const nativeChrome = !!process.env.MALMARK_CHROME_PATH;
+  const context = await chromium.launchPersistentContext(profile, {
+    channel: nativeChrome ? undefined : 'chromium',
+    executablePath: nativeChrome
+      ? process.env.MALMARK_CHROME_PATH
+      : process.env.MALMARK_BROWSER_PATH,
+    headless: true,
+    ignoreDefaultArgs: nativeChrome ? ['--disable-extensions'] : undefined,
+    args: nativeChrome
+      ? ['--enable-unsafe-extension-debugging']
+      : [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
+  });
+  try {
+    if (nativeChrome)
+      await (
+        await context.browser()!.newBrowserCDPSession()
+      ).send('Extensions.loadUnpacked', { path: extension });
+    const worker = context.serviceWorkers()[0] || (await context.waitForEvent('serviceworker'));
+    await fixtures(context, worker, true);
+    await worker.evaluate(() => {
+      const root = globalThis as any;
+      const anime = {
+        id: 10,
+        title: 'Selected Match',
+        num_episodes: 12,
+        my_list_status: { status: 'watching', num_episodes_watched: 1 },
+      };
+      root.testWrites = [];
+      root.fetch = async (url: string, options: any = {}) => {
+        if (options.method && options.method !== 'GET') root.testWrites.push(options.body);
+        return new Response(
+          JSON.stringify(url.includes('/anime?') ? { data: [{ node: anime }] } : anime),
+        );
+      };
+    });
+    await context.route('https://static.crunchyroll.com/manual-match-player', (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<video style="width:640px;height:360px"></video>',
+      }),
+    );
+    await context.route('https://www.crunchyroll.com/watch/**', (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<html><head><title>Season 1 - Watch on Crunchyroll</title></head><body><a href="/series/SHOW/a-show">A Show</a><h1>Episode 2</h1><iframe style="width:700px;height:400px" src="https://static.crunchyroll.com/manual-match-player"></iframe></body></html>',
+      }),
+    );
+    const page = await context.newPage();
+    await page.goto('https://www.crunchyroll.com/watch/EP2/episode');
+    const tabId = await watchTab(worker, page.url());
+    await expect.poll(async () => (await session(worker, tabId))?.match).toBe('unmatched');
+    const frameId = await worker.evaluate(
+      async (tabId) =>
+        (await (globalThis as any).chrome.webNavigation.getAllFrames({ tabId })).find((f: any) =>
+          f.url.includes('manual-match-player'),
+        ).frameId,
+      tabId,
+    );
+    const popup = await context.newPage();
+    await popup.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html?tab=${tabId}`);
+    await popup.getByRole('button', { name: 'Matches', exact: true }).click();
+    await popup.getByRole('button', { name: 'Search anime', exact: true }).click();
+    await popup.locator('.search-result').click();
+    await expect(popup.getByRole('button', { name: 'Save match', exact: true })).toBeVisible();
+    // Keep popup polling inside its recovery cooldown so only saving the match can reconnect it.
+    await worker.evaluate(() => {
+      const root = globalThis as any;
+      root.testTime = Date.now();
+      Date.now = () => root.testTime;
+    });
+    await popup.evaluate(async (tabId) => {
+      await (globalThis as any).chrome.runtime.sendMessage({ type: 'GET_STATE', tabId });
+    }, tabId);
+    await worker.evaluate(
+      async ({ tabId, frameId }) => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await (globalThis as any).chrome.scripting.executeScript({
+          target: { tabId, frameIds: [frameId] },
+          func: () => {
+            window.__malmarkController?.stop();
+            (window as any).samePlayerDocument = true;
+            Object.defineProperties(document.querySelector('video')!, {
+              duration: { value: 1000, configurable: true },
+              currentTime: { value: 400, configurable: true },
+              paused: { value: false, configurable: true },
+            });
+          },
+        });
+      },
+      { tabId, frameId },
+    );
+    await popup.getByRole('button', { name: 'Save match', exact: true }).click();
+    await expect
+      .poll(async () => (await session(worker, tabId))?.playerConnected, { timeout: 2500 })
+      .toBe(true);
+    const matched = await session(worker, tabId);
+    expect(matched.anime.id).toBe(10);
+    expect(matched.matchSource).toBe('manual');
+    expect(matched.progress.position).toBe(400);
+    expect(matched.progress.watched).toBe(0);
+    await worker.evaluate(
+      async ({ tabId, frameId }) => {
+        const root = globalThis as any;
+        root.testTime += 5000;
+        await root.chrome.scripting.executeScript({
+          target: { tabId, frameIds: [frameId] },
+          func: () => {
+            const video = document.querySelector('video')!;
+            Object.defineProperty(video, 'currentTime', { value: 405, configurable: true });
+            video.dispatchEvent(new Event('pause'));
+          },
+        });
+      },
+      { tabId, frameId },
+    );
+    await expect.poll(async () => (await session(worker, tabId))?.progress?.watched).toBe(5);
+    expect(
+      await worker.evaluate(
+        async ({ tabId, frameId }) =>
+          (
+            await (globalThis as any).chrome.scripting.executeScript({
+              target: { tabId, frameIds: [frameId] },
+              func: () => (window as any).samePlayerDocument,
+            })
+          )[0].result,
+        { tabId, frameId },
+      ),
+    ).toBe(true);
+    expect(await worker.evaluate(() => (globalThis as any).testWrites)).toEqual([]);
+  } finally {
+    await context.close();
+    if (!profile.startsWith(root + sep)) throw new Error('Unsafe manual match test profile path');
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
 test('refresh retains 2% watched for an episode already logged on MAL and resumes without crediting the seek', async () => {
   test.setTimeout(45000);
   const root = resolve('artifacts');

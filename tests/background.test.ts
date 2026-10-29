@@ -41,7 +41,7 @@ const mock = vi.hoisted(() => {
     tabs: {
       get: vi.fn(async () => ({ id: 1, url: 'https://www.crunchyroll.com/watch/show?ep=1' })),
       query: vi.fn(async () => [] as { id: number; url: string }[]),
-      sendMessage: vi.fn(async () => undefined),
+      sendMessage: vi.fn(async (): Promise<unknown> => undefined),
       create: vi.fn(),
       update: vi.fn(),
       onRemoved: { addListener: vi.fn() },
@@ -69,7 +69,7 @@ const mock = vi.hoisted(() => {
       unregisterContentScripts: vi.fn(),
     },
     webNavigation: {
-      getAllFrames: vi.fn(async () => []),
+      getAllFrames: vi.fn(async () => [] as { frameId: number; url: string }[]),
       onCommitted: { addListener: vi.fn() },
       onHistoryStateUpdated: { addListener: vi.fn() },
     },
@@ -603,6 +603,59 @@ describe('finished series completion', () => {
 });
 
 describe('background consent boundary', () => {
+  it.each(['healthy', 'missing'])(
+    'reconnects permitted player frames after a manual match (%s tracker)',
+    async (health) => {
+      const previous = session();
+      previous.anime = undefined;
+      previous.match = 'unmatched';
+      previous.matchSource = undefined;
+      previous.progress = { ranges: [[0, 200]], watched: 200, duration: 1000, position: 200 };
+      await mock.browser.storage.session.set({ 'tab:1': previous });
+      mock.browser.permissions.contains.mockResolvedValue(true);
+      mock.browser.webNavigation.getAllFrames.mockResolvedValueOnce([
+        { frameId: 7, url: 'https://static.crunchyroll.com/player' },
+      ]);
+      mock.browser.tabs.sendMessage
+        .mockReset()
+        .mockResolvedValue(undefined)
+        .mockResolvedValueOnce(health === 'healthy' ? { ready: true } : undefined)
+        .mockResolvedValueOnce(health === 'healthy' ? { ready: true } : undefined);
+      const fetch = vi.fn().mockImplementation(async () => json(anime));
+      vi.stubGlobal('fetch', fetch);
+      mock.browser.tabs.sendMessage.mockClear();
+      mock.browser.scripting.executeScript.mockClear();
+      const reply = await message({
+        type: 'SAVE_MAPPING',
+        tabId: 1,
+        animeId: 1,
+        prefix: detection.url,
+        episodeOffset: 0,
+      });
+      expect(reply.ok).toBe(true);
+      const saved = mock.getSession()['tab:1'] as WatchSession;
+      expect(saved.anime?.id).toBe(1);
+      expect(saved.matchSource).toBe('manual');
+      expect(saved.progress.watched).toBe(0);
+      expect(mock.browser.tabs.sendMessage).toHaveBeenCalledWith(
+        1,
+        { type: 'PING_PLAYER' },
+        { frameId: 0 },
+      );
+      expect(mock.browser.tabs.sendMessage).toHaveBeenCalledWith(
+        1,
+        { type: 'PING_PLAYER' },
+        { frameId: 7 },
+      );
+      if (health === 'missing')
+        expect(mock.browser.scripting.executeScript).toHaveBeenCalledWith({
+          target: { tabId: 1, frameIds: [7] },
+          files: ['content.js'],
+        });
+      else expect(mock.browser.scripting.executeScript).not.toHaveBeenCalled();
+      expect(fetch.mock.calls.every(([, options]) => !options?.method)).toBe(true);
+    },
+  );
   async function reminder(parentFrameId = 0) {
     const item: PendingUpdate = {
       id: '5:1:2',
@@ -1006,8 +1059,15 @@ describe('background consent boundary', () => {
         { id: '5:1:3', anime, episode: 3, previous: 1, createdAt: Date.now(), tabId: 1 },
       ],
     });
+    mock.browser.permissions.contains.mockResolvedValue(true);
+    mock.browser.tabs.sendMessage.mockClear();
     expect((await message({ type: 'SET_EPISODE', tabId: 1, episode: 4 })).ok).toBe(true);
     expect(mock.getLocal().pending).toEqual([expect.objectContaining({ episode: 2 })]);
+    expect(mock.browser.tabs.sendMessage).toHaveBeenCalledWith(
+      1,
+      { type: 'PING_PLAYER' },
+      { frameId: 0 },
+    );
   });
   it('accepts 65% and queues existing qualifying playback when settings are saved', async () => {
     const s = session();

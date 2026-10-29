@@ -516,6 +516,7 @@ async function uiMessage(message: Message): Promise<unknown> {
         ),
       });
       await badge(message.tabId, fresh);
+      await injectPlayers(message.tabId).catch(() => undefined);
       return;
     }
     case 'REMOVE_MAPPING': {
@@ -550,6 +551,7 @@ async function uiMessage(message: Message): Promise<unknown> {
       });
       await setSession(message.tabId, session);
       await badge(message.tabId, session);
+      await injectPlayers(message.tabId).catch(() => undefined);
       return;
     }
     case 'ADD_WATCHING': {
