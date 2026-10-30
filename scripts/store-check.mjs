@@ -11,6 +11,8 @@ const listing = JSON.parse(await readFile('store/listing.json', 'utf8'));
 if (
   !listing.name ||
   listing.name.length > 75 ||
+  !listing.firefoxName ||
+  listing.firefoxName.length > 30 ||
   listing.shortDescription.length > 132 ||
   listing.firefoxSummary.length > 250
 )
@@ -24,9 +26,18 @@ for (const target of ['chromium', 'firefox']) {
   const manifest = JSON.parse(strFromU8(files['manifest.json']));
   if (target === 'firefox' && manifest.browser_specific_settings.gecko_android)
     throw new Error('The initial store release is desktop-only; Android has not been validated.');
-  if (target === 'chromium' && manifest.key !== (configuration.chromiumPublicKey || undefined))
-    throw new Error('Chromium public key differs from the recorded store build configuration.');
-  if (manifest.name !== listing.name || manifest.description !== listing.shortDescription)
+  if (target === 'chromium') {
+    if (Object.hasOwn(manifest, 'key'))
+      throw new Error('The Chrome Web Store upload ZIP must not contain manifest.key.');
+    const localManifest = JSON.parse(await readFile('dist/chromium/manifest.json', 'utf8'));
+    if (localManifest.key !== (configuration.chromiumPublicKey || undefined))
+      throw new Error('Local Chromium public key differs from the recorded build configuration.');
+    checks.push(
+      'Chrome upload omits manifest.key; the unpacked local build keeps its configured key',
+    );
+  }
+  const expectedName = target === 'firefox' ? listing.firefoxName : listing.name;
+  if (manifest.name !== expectedName || manifest.description !== listing.shortDescription)
     throw new Error('Manifest/listing mismatch.');
   if (
     manifest.manifest_version !== 3 ||

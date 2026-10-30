@@ -93,6 +93,7 @@ for (const target of ['firefox', 'chromium']) {
       target === 'firefox' ? { scripts: ['background.js'] } : { service_worker: 'background.js' },
   };
   if (target === 'firefox') {
+    manifest.name = listing.firefoxName;
     manifest.sidebar_action = {
       default_title: 'Malmark',
       default_panel: 'sidebar.html',

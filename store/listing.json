@@ -1,5 +1,6 @@
 {
   "name": "Malmark — MyAnimeList episode tracker",
+  "firefoxName": "Malmark - MyAnimeList Tracker",
   "shortDescription": "Track anime on Crunchyroll and confirm MyAnimeList updates. Add other websites yourself with the element picker.",
   "firefoxSummary": "Keep your MyAnimeList progress in step with Crunchyroll. Review episode updates in a sidebar, match seasons manually, and optionally add your own websites.",
   "language": "en",

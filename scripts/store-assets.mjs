@@ -39,7 +39,7 @@ const scenarios = [
     eyebrow: 'YOUR LIST. YOUR SAY.',
     title: 'One episode.<br>Your approval.',
     description: 'Review each update before it reaches your list—even after autoplay moves on.',
-    detail: 'Every list change needs your approval',
+    detail: 'Confirm updates by default; automatic progress is optional',
     view: 'watching',
   },
   {

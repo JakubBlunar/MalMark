@@ -11,10 +11,10 @@ Features
 • Optional completion and scoring for Finished Airing anime after the last episode.
 • A selector picker for other HTTPS websites you choose to add, with access granted per domain.
 
-Updates ask for confirmation by default. Optionally enable automatic progress for exactly the next episode of an anime already in Currently Watching. It checks fresh MAL progress and shows a four-second success notice; other cases and failed updates keep the confirmation flow. Completion and scoring remain manual. Store users sign in through MyAnimeList without creating an API application.
+Updates ask for confirmation by default. Optionally enable automatic progress for exactly the next episode after your saved count, or episode 1 of a new title. It checks fresh MAL progress and shows a four-second success notice. New titles are added to Currently Watching and Plan to Watch titles move there. Completed and Dropped keep their status; fully logged titles stay untouched during a rewatch. Gaps, On Hold titles and failed updates ask for confirmation. Completion and scoring remain manual. You can also enable automatic finish dates to fill a missing date when you mark an anime Completed; existing dates are preserved. Store users sign in through MyAnimeList without creating an API application.
 
 Data and permissions
-Malmark reads anime titles, episode labels and accessible player timing on supported or explicitly permitted pages. Titles and searches go to MAL for matching. Login requests, tokens and approved list changes are sent to MAL. Account tokens, selectors, saved matches and playback checkpoints remain in local extension storage. There is no Malmark backend, analytics or advertising. The privacy policy describes retention and removal.
+Malmark reads anime titles, episode labels and accessible player timing on supported or explicitly permitted pages. Titles and searches go to MAL for matching. Login requests, tokens, approved list changes and explicitly enabled automatic episode counts are sent to MAL. Optional finish dates go to MAL only with a confirmed completion. Account tokens, selectors, saved matches and playback checkpoints remain in local extension storage. There is no Malmark backend, analytics or advertising. The privacy policy describes retention and removal.
 
 A MyAnimeList account and access to streaming content are required. Crunchyroll may require a subscription. Other sites need manual setup and may not work with every player. Netflix is not built in. Malmark supplies no streaming content and does not download video.
 

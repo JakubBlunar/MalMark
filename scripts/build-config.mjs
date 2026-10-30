@@ -31,3 +31,10 @@ export function chromiumId(publicKey) {
     .map((character) => String.fromCharCode(97 + parseInt(character, 16)))
     .join('');
 }
+
+export function packageManifest(manifest, target, distribution) {
+  const packaged = { ...manifest };
+  // The key pins an unpacked local test build; the Web Store owns its upload identity.
+  if (target === 'chromium' && distribution === 'store') delete packaged.key;
+  return packaged;
+}

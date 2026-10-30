@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, writeFile, rm, readdir } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { resolve, dirname, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { unzipSync } from 'fflate';
@@ -20,19 +20,16 @@ try {
     cwd: temporary,
     stdio: 'inherit',
   });
+  execFileSync(process.execPath, ['scripts/package.mjs'], {
+    cwd: temporary,
+    stdio: 'inherit',
+  });
   const counts = {};
   for (const target of ['chromium', 'firefox']) {
     const expected = unzipSync(await readFile(`artifacts/malmark-store-${target}.zip`));
-    const rebuilt = {};
-    async function walk(folder, prefix = '') {
-      for (const entry of await readdir(folder, { withFileTypes: true })) {
-        const path = resolve(folder, entry.name);
-        const name = prefix + entry.name;
-        if (entry.isDirectory()) await walk(path, name + '/');
-        else rebuilt[name] = await readFile(path);
-      }
-    }
-    await walk(resolve(temporary, 'dist', target));
+    const rebuilt = unzipSync(
+      await readFile(resolve(temporary, 'artifacts', `malmark-store-${target}.zip`)),
+    );
     if (Object.keys(expected).length !== Object.keys(rebuilt).length)
       throw new Error(`${target}: rebuilt file count differs`);
     for (const [name, data] of Object.entries(expected))

@@ -4,9 +4,25 @@ import { resolve } from 'node:path';
 import { bundledPackageRoots, thirdPartyNotices } from '../scripts/licenses.mjs';
 import { validateReleaseVersion } from '../scripts/release-version.mjs';
 import { generateKeyPairSync } from 'node:crypto';
-import { buildConfig, chromiumId } from '../scripts/build-config.mjs';
+import { buildConfig, chromiumId, packageManifest } from '../scripts/build-config.mjs';
 
 describe('release packaging', () => {
+  it('omits the local test key from Chrome store uploads without changing the local manifest', () => {
+    const manifest = {
+      manifest_version: 3,
+      name: 'Malmark',
+      key: 'local-test-public-key',
+      permissions: ['identity'],
+    };
+    expect(packageManifest(manifest, 'chromium', 'store')).toEqual({
+      manifest_version: 3,
+      name: 'Malmark',
+      permissions: ['identity'],
+    });
+    expect(manifest.key).toBe('local-test-public-key');
+    expect(packageManifest(manifest, 'chromium', 'unpacked')).toEqual(manifest);
+    expect(packageManifest(manifest, 'firefox', 'store')).toEqual(manifest);
+  });
   it('keeps publisher configuration out of GitHub/unpacked builds', () => {
     expect(
       buildConfig(false, {

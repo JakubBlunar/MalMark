@@ -45,6 +45,7 @@ try {
   const addon = await remote.getInstalledAddon(manifest.browser_specific_settings.gecko.id);
   if (addon.backgroundScriptStatus !== 'RUNNING' || addon.warnings.length)
     throw new Error('Firefox did not start the add-on cleanly.');
+  const redirectURL = await extensionRedirectURL(remote, addon);
   await writeFile(
     'artifacts/firefox-smoke.json',
     JSON.stringify(
@@ -55,18 +56,19 @@ try {
         backgroundScriptStatus: addon.backgroundScriptStatus,
         warnings: addon.warnings,
         version: manifest.version,
+        redirectURL,
         manifestSha256: createHash('sha256')
           .update(await readFile('dist/firefox/manifest.json'))
           .digest('hex'),
         scope:
-          'Native Firefox temporary installation and background startup only. Store signing, sidebar interaction, consent UI, MAL OAuth and live playback still require manual verification.',
+          'Native Firefox temporary installation, background startup and extension redirect URL. Store signing, sidebar interaction, consent UI, MAL OAuth and live playback still require manual verification.',
       },
       null,
       2,
     ) + '\n',
   );
   console.log(
-    'PASS Native Firefox temporary installation and background startup; no install warnings.',
+    `PASS Native Firefox temporary installation and background startup; no install warnings. MAL callback: ${redirectURL}`,
   );
 } finally {
   remote?.disconnect();
@@ -76,4 +78,62 @@ try {
   );
   if (!profile.startsWith(root + sep)) throw new Error('Unsafe isolated Firefox profile');
   await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+}
+
+async function extensionRedirectURL(remote, addon) {
+  const watcher = await remote.addonRequest(addon, 'getWatcher');
+  const client = remote.client;
+  let backgroundTarget;
+  let completeEvaluation;
+  const evaluation = new Promise((resolve) => {
+    completeEvaluation = resolve;
+  });
+  const handleMessage = client._handleMessage.bind(client);
+  // This web-ext client predates watcher/evaluation events. Handle only the events
+  // needed by this isolated test, leaving normal protocol responses to the client.
+  client._handleMessage = (packet) => {
+    if (packet.from === watcher.actor && packet.type) {
+      if (
+        packet.type === 'target-available-form' &&
+        packet.target?.url?.endsWith('/_generated_background_page.html')
+      )
+        backgroundTarget = packet.target;
+      return;
+    }
+    if (packet.type === 'evaluationResult') {
+      completeEvaluation(packet);
+      return;
+    }
+    return handleMessage(packet);
+  };
+  let timer;
+  try {
+    await client.request({ to: watcher.actor, type: 'watchTargets', targetType: 'frame' });
+    if (!backgroundTarget)
+      throw new Error('Firefox did not expose the extension background target.');
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('Firefox redirect evaluation timed out.')), 10000);
+    });
+    const result = await Promise.race([
+      (async () => {
+        await client.request({
+          to: backgroundTarget.consoleActor,
+          type: 'evaluateJSAsync',
+          text: 'browser.identity.getRedirectURL()',
+        });
+        return evaluation;
+      })(),
+      deadline,
+    ]);
+    if (
+      result.hasException ||
+      typeof result.result !== 'string' ||
+      !result.result.startsWith('https://')
+    )
+      throw new Error('Firefox did not return a valid extension redirect URL.');
+    return result.result;
+  } finally {
+    clearTimeout(timer);
+    client._handleMessage = handleMessage;
+  }
 }
