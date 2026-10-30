@@ -28,6 +28,7 @@ export async function reviewerSource(configuration) {
   ];
   async function walk(folder) {
     for (const entry of await readdir(folder, { withFileTypes: true })) {
+      if (entry.name === 'release-audit.md') continue;
       const path = join(folder, entry.name);
       if (entry.isDirectory()) await walk(path);
       else if (entry.isFile())

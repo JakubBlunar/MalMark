@@ -86,6 +86,7 @@ for (const name of [
 for (const name of Object.keys(source))
   if (
     name === '.env' ||
+    /(^|\/)release-audit\.md$/.test(name) ||
     name.startsWith('.git/') ||
     name.startsWith('node_modules/') ||
     /\.(?:pem|key)$/.test(name)

@@ -2,7 +2,7 @@
 
 Descriptions, screenshots and account disclosures are uploaded in the store dashboards. The extension ZIP supplies its manifest name, short description, permissions and icons; it does not upload the long listing or screenshots for you. [Chrome listing fields](https://developer.chrome.com/docs/webstore/cws-dashboard-listing), [Firefox submission](https://extensionworkshop.com/documentation/publish/submitting-an-add-on/).
 
-1. Read [release-audit.md](release-audit.md) and finish its remaining checks before submitting.
+1. Complete the privacy, permission and reviewer checks below before submitting.
 2. Run `npm run package:store`. Upload `artifacts/malmark-store-chromium.zip` to Chrome and `malmark-store-firefox.zip` to AMO. AMO also needs the generated `malmark-store-reviewer-source.zip`.
 3. Run `npm run store:assets`. Images appear in `artifacts/store/`, with a contact sheet and image manifest. This captures the real extension UI using clearly marked sample data and original artwork.
 4. Run `npm run verify:review` to extract the reviewer ZIP into a clean directory, install pinned dependencies from the local npm cache and compare a fresh build with both store ZIPs. Run `npm run store:check` for metadata, source contents and image sizes. These are preparation checks, not store approval.
