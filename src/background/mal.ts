@@ -147,7 +147,8 @@ const fields =
 export async function searchAnime(query: string): Promise<Anime[]> {
   const q = query.trim().slice(0, 100);
   if (q.length < 2) throw new Error('Enter at least two characters to search.');
-  const params = new URLSearchParams({ q, limit: '20', fields });
+  // MAL otherwise omits flagged titles, including some ecchi anime, from matching.
+  const params = new URLSearchParams({ q, limit: '20', fields, nsfw: 'true' });
   return (await request<{ data: { node: Anime }[] }>(`/anime?${params}`)).data.map((a) => a.node);
 }
 

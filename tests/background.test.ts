@@ -442,6 +442,19 @@ describe('OAuth and MAL transport', () => {
     expect(fetch.mock.calls[1][0]).toContain('/anime/1?fields=');
     expect(fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer access');
   });
+  it('includes flagged titles in manual search results', async () => {
+    const explorer: Anime = { id: 56733, title: 'Magical★Explorer', num_episodes: 12 };
+    const fetch = vi.fn().mockImplementation(async (url: string) =>
+      json({
+        data: new URL(url).searchParams.get('nsfw') === 'true' ? [{ node: explorer }] : [],
+      }),
+    );
+    vi.stubGlobal('fetch', fetch);
+    expect(await message({ type: 'SEARCH', query: 'Magical' })).toEqual({
+      ok: true,
+      data: [explorer],
+    });
+  });
   it('refreshes expired tokens once for simultaneous requests', async () => {
     await mock.browser.storage.local.set({ auth: { ...auth, expiresAt: 0 } });
     const fetch = vi
