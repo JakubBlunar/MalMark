@@ -34,6 +34,41 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 describe('recoverable content connection', () => {
+  it('does not let an older config response overwrite selectors edited while loading', async () => {
+    let finishOld!: (value: unknown) => void;
+    let loads = 0;
+    const base = { id: 'chosen', origin: 'https://www.crunchyroll.com', createdAt: 1 };
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<h2 id="updated-title">Latest Anime</h2><b id="updated-episode">Episode 9</b>',
+    );
+    mock.send.mockImplementation(async (message) => {
+      if (message.type === 'GET_SITE_CONFIG') {
+        if (++loads === 1)
+          return new Promise((resolve) => {
+            finishOld = resolve;
+          });
+        return {
+          ok: true,
+          data: { ...base, titleSelector: '#updated-title', episodeSelector: '#updated-episode' },
+        };
+      }
+      return { ok: true };
+    });
+    await import('../src/content/index');
+    await mock.add.mock.calls.at(-1)![0]({ type: 'SITE_CONFIG_CHANGED' });
+    finishOld({ ok: true, data: { ...base, titleSelector: 'a', episodeSelector: 'h1' } });
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(loads).toBe(2);
+    expect(
+      mock.send.mock.calls.some(
+        ([message]) =>
+          message.type === 'DETECTION' &&
+          message.detection?.title === 'Latest Anime' &&
+          message.detection?.episode === 9,
+      ),
+    ).toBe(true);
+  });
   it('shows an automatic success for four seconds even with manual prompts disabled', async () => {
     await import('../src/content/index');
     await vi.advanceTimersByTimeAsync(6000);

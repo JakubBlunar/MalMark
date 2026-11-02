@@ -221,6 +221,7 @@ test('unpacked installations in different folders show their own OAuth callback'
 });
 
 test('per-domain picker survives unrelated episode URLs', async () => {
+  test.setTimeout(60000);
   const root = resolve('artifacts');
   await mkdir(root, { recursive: true });
   const profile = await mkdtemp(resolve(root, 'browser-profile-'));
@@ -251,7 +252,7 @@ test('per-domain picker survives unrelated episode URLs', async () => {
     await context.route('https://myanimelist.net/malmark-fixture/**', (route) =>
       route.fulfill({
         contentType: 'text/html',
-        body: '<html><body style="margin:80px"><h2 id="anime-title">Cyberpunk: Edgerunners 2</h2><div id="servers-content"><div class="ps_-status"><div class="server-notice"><strong>You are watching <b>Episode 8</b></strong></div></div></div></body></html>',
+        body: '<html><body style="margin:80px"><h2 id="anime-title">Cyberpunk: Edgerunners 2</h2><div id="servers-content"><div class="ps_-status"><div class="server-notice"><strong>You are watching <b>Episode 8</b></strong></div></div></div><span id="edited-episode">Episode 11</span></body></html>',
       }),
     );
     const page = await context.newPage();
@@ -273,6 +274,20 @@ test('per-domain picker survives unrelated episode URLs', async () => {
     await expect(page.getByRole('heading', { name: 'Pick the episode number.' })).toBeVisible();
     await page.locator('.server-notice b').click();
     await expect(page.getByRole('heading', { name: 'Does this look right?' })).toBeVisible();
+    await page.getByLabel('Episode selector', { exact: true }).fill('???');
+    await expect(page.getByRole('button', { name: 'Save website', exact: true })).toBeDisabled();
+    await expect(
+      page.getByText('Episode selector is not valid CSS.', { exact: true }),
+    ).toBeVisible();
+    await page.getByLabel('Episode selector', { exact: true }).fill('.missing-episode');
+    await expect(
+      page.getByText('Episode selector matches no elements on this page.', { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByLabel('Episode selector', { exact: true })
+      .fill('#servers-content .server-notice b');
+    await expect(page.getByText('1 match: Episode 8', { exact: true })).toBeVisible();
+    await page.screenshot({ path: 'artifacts/screenshots/edit-picker-selectors.png' });
     await page.getByRole('button', { name: 'Save website', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'You’re all set.' })).toBeVisible();
     await expect
@@ -322,6 +337,87 @@ test('per-domain picker survives unrelated episode URLs', async () => {
         ),
       )
       .toBe(9);
+
+    // A saved edit must update every open watch page on this domain.
+    const second = await context.newPage();
+    await second.goto('https://myanimelist.net/malmark-fixture/selector-second');
+    const secondId = await worker.evaluate(
+      async () =>
+        (
+          await (globalThis as any).chrome.tabs.query({
+            url: 'https://myanimelist.net/malmark-fixture/selector-second',
+          })
+        )[0].id,
+    );
+    await expect
+      .poll(async () =>
+        worker.evaluate(
+          async (tabId) =>
+            (await (globalThis as any).chrome.storage.session.get(`tab:${tabId}`))[`tab:${tabId}`]
+              ?.detection?.episode,
+          secondId,
+        ),
+      )
+      .toBe(8);
+    const editor = await context.newPage();
+    await editor.goto(`chrome-extension://${id}/options.html?tab=${tabId}&view=sites`);
+    const saved = editor.getByRole('region', { name: 'Website myanimelist.net', exact: true });
+    await saved.getByText('Edit selectors', { exact: true }).click();
+    await saved.getByLabel('Episode selector', { exact: true }).fill('???');
+    await saved.getByRole('button', { name: 'Save selectors', exact: true }).click();
+    await expect(saved.getByRole('alert')).toHaveText('Episode selector is not valid CSS.');
+    await saved.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(saved.getByLabel('Episode selector', { exact: true })).toHaveValue(
+      site.episodeSelector,
+    );
+    await saved.getByLabel('Episode selector', { exact: true }).fill('.missing-episode');
+    await saved.getByRole('button', { name: 'Test on this page', exact: true }).click();
+    await expect(saved.getByRole('status')).toContainText('matches no elements');
+    await saved.getByLabel('Episode selector', { exact: true }).fill('#edited-episode');
+    await saved.getByRole('button', { name: 'Test on this page', exact: true }).click();
+    await expect(saved.getByRole('status')).toContainText('1 match: Episode 11');
+    await saved.getByRole('button', { name: 'Save selectors', exact: true }).click();
+    for (const targetId of [tabId, secondId])
+      await expect
+        .poll(async () =>
+          worker.evaluate(
+            async (tabId) =>
+              (await (globalThis as any).chrome.storage.session.get(`tab:${tabId}`))[`tab:${tabId}`]
+                ?.detection?.episode,
+            targetId,
+          ),
+        )
+        .toBe(11);
+    await editor.setViewportSize({ width: 320, height: 850 });
+    expect(await editor.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await saved.screenshot({ path: 'artifacts/screenshots/edit-saved-selectors.png' });
+    for (const surface of ['popup', 'sidebar']) {
+      const ui = await context.newPage();
+      await ui.setViewportSize({ width: surface === 'popup' ? 420 : 320, height: 850 });
+      await ui.goto(`chrome-extension://${id}/${surface}.html?tab=${tabId}&view=sites`);
+      if (surface === 'sidebar') await page.bringToFront();
+      const card = ui.getByRole('region', { name: 'Website myanimelist.net', exact: true });
+      await card
+        .getByText('Edit selectors', { exact: true })
+        .evaluate((element: HTMLElement) => element.click());
+      await expect(card.getByLabel('Anime title selector', { exact: true })).toBeEditable();
+      await expect(card.getByLabel('Episode selector', { exact: true })).toHaveValue(
+        '#edited-episode',
+      );
+      expect(await ui.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+      await ui.close();
+    }
+    // Technical users can also skip picking and enter both selectors directly.
+    await editor.getByRole('button', { name: 'Choose elements on this page', exact: true }).click();
+    await page.getByRole('button', { name: 'Enter selectors manually', exact: true }).click();
+    await page.getByLabel('Anime title selector', { exact: true }).fill('#anime-title');
+    await page.getByLabel('Episode selector', { exact: true }).fill('#edited-episode');
+    await page.getByRole('button', { name: 'Save website', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'You’re all set.' })).toBeVisible();
   } finally {
     await context.close();
     if (!profile.startsWith(root + sep)) throw new Error('Unsafe test profile path');

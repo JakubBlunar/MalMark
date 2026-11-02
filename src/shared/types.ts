@@ -193,6 +193,14 @@ export type SetupMessage =
   | { type: 'START_SETUP'; tabId: number }
   | { type: 'PREPARE_SETUP'; tabId: number; url: string; requestId: string }
   | { type: 'CANCEL_SETUP'; tabId: number; requestId: string }
+  | { type: 'UPDATE_SITE_CONFIG'; id: string; titleSelector: string; episodeSelector: string }
+  | {
+      type: 'TEST_SITE_SELECTORS';
+      id: string;
+      tabId: number;
+      titleSelector: string;
+      episodeSelector: string;
+    }
   | { type: 'SAVE_SITE_CONFIG'; nonce: string; titleSelector: string; episodeSelector: string }
   | { type: 'REMOVE_SITE_CONFIG'; id: string };
 

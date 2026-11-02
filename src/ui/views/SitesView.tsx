@@ -35,7 +35,14 @@ export function SitesView({
         </div>
       </div>
       {state.sites.map((site) => (
-        <SavedSiteCard key={site.id} site={site} busy={busy} act={act} />
+        <SavedSiteCard
+          key={site.id}
+          site={site}
+          busy={busy}
+          act={act}
+          tabId={tabId}
+          tabUrl={state.tabUrl}
+        />
       ))}
       <div className="subtle-note">
         <ShieldCheck size={14} />

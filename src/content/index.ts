@@ -11,6 +11,7 @@ import type {
 } from '../shared/types';
 import { siteForUrl } from '../shared/sites';
 import { startPicker } from './picker';
+import { inspectSiteSelectors } from '../shared/selector-validation';
 import { createPlayerTracker } from './player';
 
 declare global {
@@ -55,6 +56,7 @@ function start(): { stop: () => void } | undefined {
   let customConfig: SiteConfig | undefined;
   let configReady = false;
   let configLoading = false;
+  let configRevision = 0;
   let activeScan: symbol | undefined;
   let detectionAcknowledgedAt = 0;
   let lastUrl = location.href;
@@ -287,6 +289,17 @@ function start(): { stop: () => void } | undefined {
   const listener = (message: unknown, sender: browser.Runtime.MessageSender) => {
     if (!message || typeof message !== 'object' || !('type' in message)) return false;
     if (
+      message.type === 'PREVIEW_SITE_SELECTORS' &&
+      topPage &&
+      sender?.id === browser.runtime.id &&
+      !sender.tab &&
+      'titleSelector' in message &&
+      typeof message.titleSelector === 'string' &&
+      'episodeSelector' in message &&
+      typeof message.episodeSelector === 'string'
+    )
+      return Promise.resolve(inspectSiteSelectors(message.titleSelector, message.episodeSelector));
+    if (
       message.type === 'INLINE_PROMPT_SIZE' &&
       sender?.id === browser.runtime.id &&
       !sender.tab &&
@@ -330,6 +343,7 @@ function start(): { stop: () => void } | undefined {
     }
     if (message.type === 'PROMPT_CHANGED') void prompt();
     if (message.type === 'SITE_CONFIG_CHANGED') {
+      configRevision++;
       configReady = false;
       lastDetection = '';
       candidate = '';
@@ -352,6 +366,7 @@ function start(): { stop: () => void } | undefined {
           episodeSelector,
         })) as Reply<SiteConfig>;
         if (!response.ok) throw new Error(response.error);
+        configRevision++;
         customConfig = response.data;
         configReady = true;
         lastDetection = '';
@@ -387,15 +402,17 @@ function start(): { stop: () => void } | undefined {
   async function loadConfig() {
     if (configLoading || !valid) return;
     configLoading = true;
+    const revision = configRevision;
     try {
       const reply = await sendReply<SiteConfig>({ type: 'GET_SITE_CONFIG' });
-      if (reply?.ok) {
+      if (reply?.ok && valid && revision === configRevision) {
         customConfig = reply.data;
         configReady = true;
         void scanPage();
       }
     } finally {
       configLoading = false;
+      if (valid && revision !== configRevision) void loadConfig();
     }
   }
   function stop() {

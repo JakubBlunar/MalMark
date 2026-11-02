@@ -807,6 +807,54 @@ async function uiMessage(message: Message): Promise<unknown> {
       return prepareSiteSetup(message.tabId, message.url, message.requestId);
     case 'CANCEL_SETUP':
       return cancelSiteSetup(message.tabId, message.requestId);
+    case 'UPDATE_SITE_CONFIG':
+    case 'TEST_SITE_SELECTORS': {
+      if (
+        ![message.titleSelector, message.episodeSelector].every(
+          (value) => typeof value === 'string' && value.trim().length > 0 && value.length <= 2000,
+        )
+      )
+        throw new Error('Enter valid title and episode selectors (up to 2,000 characters each).');
+      const sites = await getSites();
+      const site = sites.find((site) => site.id === message.id);
+      if (!site)
+        throw new Error('This website setup was removed. Add it again from its watch page.');
+      const updated = {
+        ...site,
+        titleSelector: message.titleSelector.trim(),
+        episodeSelector: message.episodeSelector.trim(),
+      };
+      if (message.type === 'TEST_SITE_SELECTORS') {
+        const tab = await browser.tabs.get(message.tabId);
+        if (!tab.url || new URL(tab.url).origin !== site.origin || !(await configForUrl(tab.url)))
+          throw new Error(
+            'Open a watch page on this website with domain access enabled to test these selectors.',
+          );
+        await injectPlayers(message.tabId);
+        return browser.tabs.sendMessage(
+          message.tabId,
+          {
+            type: 'PREVIEW_SITE_SELECTORS',
+            titleSelector: updated.titleSelector,
+            episodeSelector: updated.episodeSelector,
+          },
+          { frameId: 0 },
+        );
+      }
+      await browser.storage.local.set({
+        sites: sites.map((current) => (current.id === site.id ? updated : current)),
+      });
+      for (const tab of await browser.tabs.query({})) {
+        if (tab.id === undefined || !tab.url || !tab.url.startsWith(site.origin + '/')) continue;
+        // Re-read metadata without allowing the old selection to finish an episode during the edit.
+        await browser.storage.session.remove([`tab:${tab.id}`, `guidancePrompt:${tab.id}`]);
+        await badge(tab.id);
+        await browser.tabs
+          .sendMessage(tab.id, { type: 'SITE_CONFIG_CHANGED' }, { frameId: 0 })
+          .catch(() => injectPlayers(tab.id!).catch(() => undefined));
+      }
+      return updated;
+    }
     case 'REMOVE_SITE_CONFIG': {
       const sites = await getSites();
       const site = sites.find((s) => s.id === message.id);

@@ -2172,6 +2172,107 @@ describe('website setup authorization', () => {
       ).ok,
     ).toBe(false);
   });
+  it('edits saved selectors and refreshes only open tabs on that exact origin', async () => {
+    const site = {
+      id: 'chosen',
+      origin: 'https://anime.example',
+      titleSelector: 'h1',
+      episodeSelector: 'b',
+      createdAt: 1,
+    };
+    const other = { ...site, id: 'other', origin: 'https://other.example' };
+    await mock.browser.storage.local.set({ sites: [site, other] });
+    await mock.browser.storage.session.set({
+      'tab:1': session(),
+      'tab:2': session(),
+      'tab:3': session(),
+    });
+    mock.browser.tabs.query.mockResolvedValueOnce([
+      { id: 1, url: site.origin + '/watch/one' },
+      { id: 2, url: site.origin + '/watch/two' },
+      { id: 3, url: 'https://anime.example.evil.test/watch' },
+    ]);
+    mock.browser.tabs.sendMessage.mockClear();
+    const reply = await message({
+      type: 'UPDATE_SITE_CONFIG',
+      id: site.id,
+      titleSelector: ' #title ',
+      episodeSelector: '#player b',
+    });
+    expect(reply.ok).toBe(true);
+    expect(mock.getLocal().sites).toEqual([
+      { ...site, titleSelector: '#title', episodeSelector: '#player b' },
+      other,
+    ]);
+    for (const tabId of [1, 2]) {
+      expect(mock.getSession()[`tab:${tabId}`]).toBeUndefined();
+      expect(mock.browser.tabs.sendMessage).toHaveBeenCalledWith(
+        tabId,
+        { type: 'SITE_CONFIG_CHANGED' },
+        { frameId: 0 },
+      );
+    }
+    expect(mock.getSession()['tab:3']).toBeDefined();
+    expect(mock.browser.tabs.sendMessage).not.toHaveBeenCalledWith(
+      3,
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+  it.each(['missing', 'empty', 'oversized', 'untrusted'])(
+    'rejects invalid saved-selector edits: %s',
+    async (invalid) => {
+      const site = {
+        id: 'chosen',
+        origin: 'https://anime.example',
+        titleSelector: 'h1',
+        episodeSelector: 'b',
+        createdAt: 1,
+      };
+      await mock.browser.storage.local.set({ sites: [site] });
+      const reply = await message(
+        {
+          type: 'UPDATE_SITE_CONFIG',
+          id: invalid === 'missing' ? 'gone' : site.id,
+          titleSelector:
+            invalid === 'empty' ? ' ' : invalid === 'oversized' ? 'a'.repeat(2001) : '#title',
+          episodeSelector: 'b',
+        },
+        invalid === 'untrusted' ? content : ui,
+      );
+      expect(reply.ok).toBe(false);
+      expect(mock.getLocal().sites).toEqual([site]);
+    },
+  );
+  it('tests selectors only on an allowed page belonging to the saved website without changing storage', async () => {
+    const site = {
+      id: 'chosen',
+      origin: 'https://anime.example',
+      titleSelector: 'h1',
+      episodeSelector: 'b',
+      createdAt: 1,
+    };
+    await mock.browser.storage.local.set({ sites: [site] });
+    const test = {
+      type: 'TEST_SITE_SELECTORS',
+      id: site.id,
+      tabId: 1,
+      titleSelector: '#title',
+      episodeSelector: '#episode',
+    };
+    expect((await message(test)).ok).toBe(false);
+    mock.browser.tabs.get.mockResolvedValue({ id: 1, url: site.origin + '/watch' });
+    expect((await message(test)).ok).toBe(false);
+    mock.browser.permissions.contains.mockResolvedValue(true);
+    mock.browser.tabs.sendMessage.mockClear();
+    expect((await message(test)).ok).toBe(true);
+    expect(mock.browser.tabs.sendMessage).toHaveBeenCalledWith(
+      1,
+      { type: 'PREVIEW_SITE_SELECTORS', titleSelector: '#title', episodeSelector: '#episode' },
+      { frameId: 0 },
+    );
+    expect(mock.getLocal().sites).toEqual([site]);
+  });
   it('ignores custom-domain tracking after permission is revoked', async () => {
     const origin = 'https://custom.example';
     await mock.browser.storage.local.set({
