@@ -9,7 +9,7 @@ import type {
   WatchSession,
 } from '../shared/types';
 import { findMapping, positiveInteger, prefixMatches, siteForUrl } from '../shared/sites';
-import { automaticMatch, titleForSeason } from '../shared/matching';
+import { searchForMatch } from './match-search';
 import { accumulate, emptyProgress, isComplete } from '../shared/progress';
 import { cancelLogin, connect, getAnime, searchAnime, updateAnime } from './mal';
 import { progressUpdateValues } from '../shared/list-status';
@@ -30,6 +30,12 @@ import { cancelSiteSetup, prepareSiteSetup, resumeSiteSetups, startSiteSetup } f
 import { chromiumSidePanel } from '../shared/sidebar';
 import { OAUTH_SETUP_REQUIRED } from '../shared/config';
 import { inlinePromptContext, inlinePromptNonce } from './inline-prompts';
+import {
+  dismissGuidance,
+  guidanceForTab,
+  guidancePromptContext,
+  guidancePromptNonce,
+} from './guidance-prompts';
 import { automaticProgress } from './automatic-progress';
 import { getProgressNotice, showProgressNotice } from './progress-notices';
 import {
@@ -118,8 +124,17 @@ async function resolve(
         previous.anime.status && !refreshMatch ? previous.anime : await getAnime(previous.anime.id);
       session.matchSource = 'automatic';
     } else {
-      const title = titleForSeason(d.title, d.season);
-      const match = automaticMatch(title, await searchAnime(title));
+      const search =
+        sameSeries &&
+        previous?.matchSearch &&
+        !previous.error &&
+        previous.detection.title === d.title &&
+        previous.detection.season === d.season &&
+        !refreshMatch
+          ? { ...previous.matchSearch, match: undefined }
+          : await searchForMatch(d);
+      session.matchSearch = { query: search.query, results: search.results };
+      const match = search.match;
       if (match) {
         session.anime = await getAnime(match.id);
         session.matchSource = 'automatic';
@@ -842,17 +857,46 @@ browser.runtime.onMessage.addListener((raw: unknown, sender: browser.Runtime.Mes
     }
     if (message.type === 'INLINE_PROMPT_SIZE') {
       if (!Number.isFinite(message.height) || message.height <= 0) return;
-      const { item, parentFrameId } = await inlinePromptContext(message.nonce, sender);
+      const context = await inlinePromptContext(message.nonce, sender)
+        .then(({ item, parentFrameId }) => ({ tabId: item.tabId, parentFrameId }))
+        .catch(() => guidancePromptContext(message.nonce, sender));
       // Deliver only to the content script containing this verified extension frame.
       await browser.tabs
-        .sendMessage(item.tabId, message, { frameId: parentFrameId })
+        .sendMessage(context.tabId, message, { frameId: context.parentFrameId })
         .catch(() => undefined);
       return;
     }
+    if (message.type === 'GUIDANCE_ACTION')
+      return serialized(async () => {
+        const { prompt, tabId, session } = await guidancePromptContext(message.nonce, sender);
+        if (message.action === 'dismiss') return dismissGuidance(prompt);
+        if (message.action === 'match' && prompt.kind === 'unmatched') {
+          await browser.tabs.create({
+            url: browser.runtime.getURL(`options.html?tab=${tabId}&view=matches`),
+          });
+          return dismissGuidance(prompt);
+        }
+        if (
+          message.action === 'player' &&
+          prompt.kind === 'player' &&
+          message.origin &&
+          prompt.origins.includes(message.origin) &&
+          session.frameOrigins.includes(message.origin) &&
+          (await browser.permissions.contains({ origins: [message.origin + '/*'] }))
+        ) {
+          await injectPlayers(tabId);
+          await browser.tabs.sendMessage(tabId, { type: 'PROMPT_CHANGED' }).catch(() => undefined);
+          return;
+        }
+        throw new Error('This action is no longer available. Open Malmark on the watch page.');
+      });
     if (message.type === 'GET_INLINE_PROMPT' || message.type === 'INLINE_PROMPT_ACTION')
       return serialized(async () => {
+        if (message.type === 'GET_INLINE_PROMPT')
+          return inlinePromptContext(message.nonce, sender)
+            .then(({ item }) => item)
+            .catch(async () => (await guidancePromptContext(message.nonce, sender)).prompt);
         const { item } = await inlinePromptContext(message.nonce, sender);
-        if (message.type === 'GET_INLINE_PROMPT') return item;
         if (message.action === 'approve') await uiMessage({ type: 'APPROVE_UPDATE', id: item.id });
         else if (message.action === 'later') {
           await browser.storage.local.set({
@@ -960,12 +1004,19 @@ browser.runtime.onMessage.addListener((raw: unknown, sender: browser.Runtime.Mes
           ? (await getPending()).filter((p) => p.tabId === sender.tab!.id && !p.deferred)
           : [];
         const item = pending.at(-1);
+        const guidance =
+          !item && session && samePage(session.detection.url, tab.url!)
+            ? await guidanceForTab(sender.tab!.id!, session)
+            : undefined;
         return {
           pending,
           notice: await getProgressNotice(sender.tab!.id!, auth?.profile?.id),
           nonce: item
             ? await inlinePromptNonce(sender.tab!.id!, tab.url!, item, sender.frameId ?? 0)
-            : undefined,
+            : guidance
+              ? await guidancePromptNonce(guidance, tab.url!, sender.frameId ?? 0)
+              : undefined,
+          guidance,
           showPrompts: (await getSettings()).showPrompts,
           newAnime:
             session?.anime && !session.anime.my_list_status
@@ -991,15 +1042,31 @@ browser.tabs.onRemoved.addListener((tabId) => {
       `notice:${tabId}`,
       `setup:${tabId}`,
       `setupPending:${tabId}`,
+      `guidancePrompt:${tabId}`,
+      `guidanceDismissed:${tabId}`,
     ]),
   );
 });
 
 browser.permissions.onAdded.addListener((permissions) => {
   if (permissions.origins?.length)
-    return serialized(resumeSiteSetups).catch((error) =>
-      console.error('Website setup failed:', error),
-    );
+    return serialized(async () => {
+      await resumeSiteSetups();
+      const entries = await browser.storage.session.get(null);
+      for (const [key, value] of Object.entries(entries)) {
+        if (!/^tab:\d+$/.test(key)) continue;
+        const session = value as WatchSession;
+        const allowed = await Promise.all(
+          session.frameOrigins.map((origin) =>
+            browser.permissions.contains({ origins: [origin + '/*'] }),
+          ),
+        );
+        if (!allowed.some(Boolean)) continue;
+        const tabId = Number(key.slice(4));
+        await injectPlayers(tabId).catch(() => undefined);
+        await browser.tabs.sendMessage(tabId, { type: 'PROMPT_CHANGED' }).catch(() => undefined);
+      }
+    }).catch((error) => console.error('Website setup failed:', error));
 });
 
 browser.webNavigation.onHistoryStateUpdated.addListener((details) => {

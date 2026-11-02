@@ -12,7 +12,11 @@ import { SavedMatches } from '../components/matching/SavedMatches';
 export function MatchesView({ state, tabId, busy, act }: ViewProps) {
   const session = state.session;
   const identity = `${tabId}/${session?.detection.seriesKey}/${session?.detection.url}`;
-  const search = useAnimeSearch(session?.detection.title || '', identity);
+  const search = useAnimeSearch(
+    session?.matchSearch?.query || session?.detection.title || '',
+    identity,
+    session?.match === 'unmatched' ? session.matchSearch?.results : undefined,
+  );
   const [selected, setSelected] = useState<Anime>();
   const existing = session ? findMapping(state.mappings, session.detection) : undefined;
   useEffect(() => setSelected(undefined), [identity]);

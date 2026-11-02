@@ -193,6 +193,7 @@ beforeEach(async () => {
   mock.browser.tabs.get.mockResolvedValue({ id: 1, url: content.url });
   mock.browser.permissions.contains.mockResolvedValue(false);
   mock.browser.webNavigation.getFrame.mockReset().mockResolvedValue(null);
+  mock.browser.webNavigation.getAllFrames.mockResolvedValue([]);
 });
 describe('OAuth and MAL transport', () => {
   it('requires personal API setup for unpacked builds, without changing an existing login', async () => {
@@ -936,6 +937,129 @@ describe('background consent boundary', () => {
       expect((await message({ type: 'GET_INLINE_PROMPT', nonce }, frame)).ok).toBe(false);
     },
   );
+  async function guidance(player = false) {
+    const current = {
+      ...session(),
+      anime: undefined,
+      match: 'unmatched' as const,
+      frameOrigins: player ? ['https://player.example'] : [],
+    };
+    await mock.browser.storage.session.set({ 'tab:1': current });
+    if (player)
+      mock.browser.webNavigation.getAllFrames.mockResolvedValue([
+        { frameId: 7, url: 'https://player.example/video' },
+      ]);
+    const reply = await message<{ nonce: string; guidance: { kind: string; origins?: string[] } }>(
+      { type: 'PROMPT_STATE' },
+      content,
+    );
+    if (!reply.ok) throw new Error(reply.error);
+    const nonce = reply.data.nonce;
+    return {
+      ...reply.data,
+      frame: { ...content, frameId: 3, url: `moz-extension://test/prompt.html#${nonce}` },
+    };
+  }
+  it('offers an unmatched-title prompt that opens the matching screen directly', async () => {
+    const prompt = await guidance();
+    expect(prompt.guidance.kind).toBe('unmatched');
+    expect(
+      (await message({ type: 'GET_INLINE_PROMPT', nonce: prompt.nonce }, prompt.frame)).ok,
+    ).toBe(true);
+    mock.browser.tabs.create.mockClear();
+    expect(
+      (
+        await message(
+          { type: 'GUIDANCE_ACTION', nonce: prompt.nonce, action: 'match' },
+          prompt.frame,
+        )
+      ).ok,
+    ).toBe(true);
+    expect(mock.browser.tabs.create).toHaveBeenCalledWith({
+      url: 'moz-extension://test/options.html?tab=1&view=matches',
+    });
+    const next = await message<{ guidance?: unknown }>({ type: 'PROMPT_STATE' }, content);
+    expect(next.ok && next.data.guidance).toBeUndefined();
+  });
+  it('keeps Later dismissed across repeated page scans and reloads', async () => {
+    const prompt = await guidance();
+    await message(
+      { type: 'GUIDANCE_ACTION', nonce: prompt.nonce, action: 'dismiss' },
+      prompt.frame,
+    );
+    for (let i = 0; i < 2; i++) {
+      const next = await message<{ guidance?: unknown }>({ type: 'PROMPT_STATE' }, content);
+      expect(next.ok && next.data.guidance).toBeUndefined();
+    }
+  });
+  it.each(['page', 'account', 'disabled', 'forged', 'content'])(
+    'rejects a guidance action with changed %s context',
+    async (change) => {
+      const prompt = await guidance();
+      if (change === 'page')
+        mock.browser.tabs.get.mockResolvedValue({ id: 1, url: content.url + '&other=1' });
+      if (change === 'account')
+        await mock.browser.storage.local.set({ auth: { ...auth, profile: { id: 6 } } });
+      if (change === 'disabled')
+        await mock.browser.storage.local.set({ settings: { showPrompts: false } });
+      expect(
+        (
+          await message(
+            {
+              type: 'GUIDANCE_ACTION',
+              nonce: change === 'forged' ? 'fake' : prompt.nonce,
+              action: 'match',
+            },
+            change === 'content' ? content : prompt.frame,
+          )
+        ).ok,
+      ).toBe(false);
+    },
+  );
+  it('offers only live unpermitted player domains and verifies Allow actions', async () => {
+    const prompt = await guidance(true);
+    expect(prompt.guidance).toMatchObject({ kind: 'player', origins: ['https://player.example'] });
+    const action = {
+      type: 'GUIDANCE_ACTION',
+      nonce: prompt.nonce,
+      action: 'player',
+      origin: 'https://player.example',
+    };
+    expect((await message(action, prompt.frame)).ok).toBe(false);
+    mock.browser.permissions.contains.mockResolvedValue(true);
+    expect(
+      (await message({ ...action, origin: 'https://unrelated.example' }, prompt.frame)).ok,
+    ).toBe(false);
+    mock.browser.scripting.executeScript.mockClear();
+    expect((await message(action, prompt.frame)).ok).toBe(true);
+    expect(mock.browser.scripting.executeScript).toHaveBeenCalledWith({
+      target: { tabId: 1, frameIds: [7] },
+      files: ['content.js'],
+    });
+  });
+  it('reconnects newly allowed players using the browser event without a popup continuation', async () => {
+    await guidance(true);
+    mock.browser.permissions.contains.mockResolvedValue(true);
+    mock.browser.scripting.executeScript.mockClear();
+    await permissionsAdded({ origins: ['https://player.example/*'] });
+    expect(mock.browser.scripting.executeScript).toHaveBeenCalledWith({
+      target: { tabId: 1, frameIds: [7] },
+      files: ['content.js'],
+    });
+  });
+  it('does not prompt for already permitted, disconnected, or unobserved frame origins', async () => {
+    const current = session();
+    current.frameOrigins = ['https://player.example'];
+    await mock.browser.storage.session.set({ 'tab:1': current });
+    const absent = await message<{ guidance?: unknown }>({ type: 'PROMPT_STATE' }, content);
+    expect(absent.ok && absent.data.guidance).toBeUndefined();
+    mock.browser.webNavigation.getAllFrames.mockResolvedValue([
+      { frameId: 7, url: 'https://player.example/video' },
+    ]);
+    mock.browser.permissions.contains.mockResolvedValue(true);
+    const permitted = await message<{ guidance?: unknown }>({ type: 'PROMPT_STATE' }, content);
+    expect(permitted.ok && permitted.data.guidance).toBeUndefined();
+  });
   it('notifies all player frames when the main watch URL changes through SPA history', async () => {
     await mock.browser.storage.session.set({ 'tab:1': session() });
     mock.browser.tabs.sendMessage.mockClear();

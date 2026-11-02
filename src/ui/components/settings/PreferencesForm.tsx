@@ -136,8 +136,8 @@ export function PreferencesForm({
           <span>
             <b>In-page prompts</b>
             <small>
-              Show manual reminders over the watch page. Automatic updates always show a brief
-              confirmation.
+              Show watch-page reminders for anime matching, player access, and manual updates.
+              Automatic updates always show a brief confirmation.
             </small>
           </span>
           <input

@@ -95,6 +95,7 @@ export interface WatchSession {
   anime?: Anime;
   match: 'searching' | 'matched' | 'unmatched' | 'signed-out';
   matchSource?: 'automatic' | 'manual';
+  matchSearch?: { query: string; results: Anime[] };
   episode: number | null;
   episodeOverride?: number;
   progress: WatchProgress;
@@ -121,6 +122,10 @@ export interface ProgressNotice {
   episode: number;
   expiresAt: number;
 }
+
+export type GuidancePrompt =
+  | { kind: 'unmatched'; id: string; title: string; tabId: number }
+  | { kind: 'player'; id: string; title: string; tabId: number; origins: string[] };
 
 export interface Auth {
   accessToken: string;
@@ -175,6 +180,12 @@ export type Message =
   | { type: 'GET_INLINE_PROMPT'; nonce: string }
   | { type: 'INLINE_PROMPT_SIZE'; nonce: string; height: number }
   | { type: 'INLINE_PROMPT_ACTION'; nonce: string; action: 'approve' | 'later' }
+  | {
+      type: 'GUIDANCE_ACTION';
+      nonce: string;
+      action: 'dismiss' | 'match' | 'player';
+      origin?: string;
+    }
   | { type: 'OPEN_EXTENSION' };
 
 export type SetupMessage =

@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import type { Anime } from '../../shared/types';
 import { inExtension, request } from '../services/extension';
 
-export function useAnimeSearch(title: string, identity: string) {
+export function useAnimeSearch(title: string, identity: string, initialResults?: Anime[]) {
   const [query, setQuery] = useState(title);
-  const [results, setResults] = useState<Anime[]>([]);
-  const [searched, setSearched] = useState(false);
+  const [results, setResults] = useState<Anime[]>(initialResults || []);
+  const [searched, setSearched] = useState(initialResults !== undefined);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
   const revision = useRef(0);
@@ -21,6 +21,8 @@ export function useAnimeSearch(title: string, identity: string) {
   useEffect(() => {
     clearResults();
     setQuery(title);
+    setResults(initialResults || []);
+    setSearched(initialResults !== undefined);
     return () => {
       revision.current++;
     };

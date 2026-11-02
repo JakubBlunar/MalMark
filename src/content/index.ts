@@ -5,6 +5,7 @@ import type {
   PendingUpdate,
   Playback,
   ProgressNotice,
+  GuidancePrompt,
   Reply,
   SiteConfig,
 } from '../shared/types';
@@ -99,6 +100,7 @@ function start(): { stop: () => void } | undefined {
       newAnime?: { id: number; title: string };
       nonce?: string;
       notice?: ProgressNotice;
+      guidance?: GuidancePrompt;
     }>({ type: 'PROMPT_STATE' });
     const item = state?.pending.at(-1);
     const notice = state?.notice && state.notice.expiresAt > Date.now() ? state.notice : undefined;
@@ -106,9 +108,11 @@ function start(): { stop: () => void } | undefined {
       ? `notice:${notice.id}`
       : item
         ? `${item.id}:${state?.nonce ?? ''}`
-        : state?.newAnime
-          ? `add:${state.newAnime.id}`
-          : '';
+        : state?.guidance
+          ? `${state.guidance.id}:${state.nonce ?? ''}`
+          : state?.newAnime
+            ? `add:${state.newAnime.id}`
+            : '';
     if (!state || (!state.showPrompts && !notice) || !id || hiddenPrompts.has(id)) {
       host?.remove();
       host = undefined;
@@ -154,10 +158,15 @@ function start(): { stop: () => void } | undefined {
       );
       return;
     }
-    if (item && state.nonce) {
+    if ((item || state.guidance) && state.nonce) {
       const frame = document.createElement('iframe');
       frame.src = browser.runtime.getURL(`prompt.html#${state.nonce}`);
-      frame.title = 'Malmark episode update';
+      frame.title =
+        state.guidance?.kind === 'player'
+          ? 'Malmark player access'
+          : state.guidance
+            ? 'Malmark anime match'
+            : 'Malmark episode update';
       frame.referrerPolicy = 'no-referrer';
       frame.style.cssText =
         'border:0;display:block;width:min(360px,calc(100vw - 48px));height:220px;max-height:calc(100dvh - 48px);border-radius:16px;box-shadow:0 12px 40px #0007;';

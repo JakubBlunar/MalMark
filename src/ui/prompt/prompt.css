@@ -74,3 +74,17 @@ small {
 .error {
   color: #efb75e;
 }
+.player-domain {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+.player-domain span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.player-domain button {
+  flex-shrink: 0;
+}

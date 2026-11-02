@@ -14,6 +14,19 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('website setup permission handoff', () => {
+  it('requests prompt player access directly and sends only the scoped completion', async () => {
+    const { grantPromptPlayer } = await import('../src/ui/services/extension');
+    const granted = grantPromptPlayer('https://player.example', 'prompt-nonce');
+    expect(mock.permission).toHaveBeenCalledWith({ origins: ['https://player.example/*'] });
+    expect(mock.send).not.toHaveBeenCalled();
+    await granted;
+    expect(mock.send).toHaveBeenCalledWith({
+      type: 'GUIDANCE_ACTION',
+      nonce: 'prompt-nonce',
+      action: 'player',
+      origin: 'https://player.example',
+    });
+  });
   it('sends intent and requests access synchronously without waiting for the background', async () => {
     const { setupWebsite } = await import('../src/ui/services/extension');
     let prepared!: (value: unknown) => void;

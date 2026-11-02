@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { automaticMatch, titleForSeason } from '../src/shared/matching';
+import { automaticMatch, matchSearchQueries, titleForSeason } from '../src/shared/matching';
 import type { Anime } from '../src/shared/types';
 
 // Factual title/alias fields from the public MAL API search on 2026-10-28.
@@ -31,6 +31,12 @@ const entries: Anime[] = [
   },
 ];
 describe('exact title ranking and seasons', () => {
+  it('treats an explicit first season as the base title without dropping later seasons', () => {
+    expect(automaticMatch('Re:Zero kara Hajimeru Isekai Seikatsu Season 1', entries)?.id).toBe(
+      31240,
+    );
+    expect(automaticMatch(titleForSeason(title, 3), entries)).toBeUndefined();
+  });
   it('does not let a commercial alias block the primary Re:ZERO TV title', () => {
     expect(automaticMatch(title, entries)?.id).toBe(31240);
   });
@@ -81,5 +87,47 @@ describe('exact title ranking and seasons', () => {
     expect(
       automaticMatch(titleForSeason('That Time I Got Reincarnated as a Slime', 4), [slime])?.id,
     ).toBe(59970);
+  });
+});
+
+describe('shorter search queries', () => {
+  it.each([
+    [
+      'Reborn as a Space Mercenary: I Woke Up Piloting the Strongest Starship!',
+      'Reborn as a Space Mercenary',
+    ],
+    [
+      'Magic Repo Man: Dumped by My Party, I’ll Cash In With a Cute Support Fairy to Become the Strongest!',
+      'Magic Repo Man',
+    ],
+  ])('tries the subtitle-free query for %s', (full, shortened) => {
+    expect(matchSearchQueries(full, 1).slice(0, 2)).toEqual([full, shortened]);
+  });
+  it('retains later seasons and split parts in every fallback query', () => {
+    const queries = matchSearchQueries('A Very Long Show: Another Adventure Season 4 Part 2', 4);
+    expect(queries.length).toBeGreaterThan(1);
+    for (const query of queries) {
+      expect(query).toContain('Season 4');
+      expect(query).toContain('Part 2');
+    }
+    expect(matchSearchQueries('A Show Season 1', 1)).toEqual(['A Show Season 1', 'A Show']);
+  });
+  it('keeps season markers when a fallback query must fit MAL’s character limit', () => {
+    const full =
+      'A Very Long Anime Title With An Extremely Long Subtitle '.repeat(3) + 'Season 4 Part 2';
+    const queries = matchSearchQueries(full, 4).slice(1);
+    expect(queries.length).toBeGreaterThan(0);
+    for (const query of queries) {
+      expect(query.length).toBeLessThanOrEqual(100);
+      expect(query).toContain('Season 4');
+      expect(query).toContain('Part 2');
+    }
+  });
+  it('keeps short titles intact and bounds long-title requests', () => {
+    expect(matchSearchQueries('Re:ZERO', null)).toEqual(['Re:ZERO']);
+    expect(matchSearchQueries('86', null)).toEqual(['86']);
+    expect(
+      matchSearchQueries('A Very Long Name With Lots Of Extra Words For Discovery', null).length,
+    ).toBeLessThanOrEqual(5);
   });
 });

@@ -58,6 +58,13 @@ export async function grantPlayer(origin: string, tabId: number): Promise<void> 
   await request({ type: 'INJECT_PLAYERS', tabId });
 }
 
+export async function grantPromptPlayer(origin: string, nonce: string): Promise<void> {
+  const granted = await browser.permissions.request({ origins: [origin + '/*'] });
+  if (!granted)
+    throw new Error('Player access was not granted. You can try again or choose Later.');
+  await request({ type: 'GUIDANCE_ACTION', nonce, action: 'player', origin });
+}
+
 export async function revokePlayer(origin: string): Promise<void> {
   await browser.permissions.remove({ origins: [origin] });
 }

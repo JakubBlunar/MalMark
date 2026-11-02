@@ -51,14 +51,6 @@ export function WatchingView({
           ))}
           {s ? (
             <>
-              <NowPlayingCard
-                session={s}
-                settings={state.settings}
-                tabId={tabId}
-                busy={busy}
-                act={act}
-                go={go}
-              />
               {!s.playerConnected &&
                 s.frameOrigins.filter((origin) => !state.playerPermissions.includes(origin + '/*'))
                   .length > 0 && (
@@ -70,6 +62,14 @@ export function WatchingView({
                     act={act}
                   />
                 )}
+              <NowPlayingCard
+                session={s}
+                settings={state.settings}
+                tabId={tabId}
+                busy={busy}
+                act={act}
+                go={go}
+              />
               <EpisodeCorrection
                 key={`${tabId}/${s.detection.url}`}
                 session={s}

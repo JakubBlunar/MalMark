@@ -2,6 +2,10 @@
 
 ## Release notes
 
+Added on-page prompts when an anime needs a manual match or an embedded player needs domain access. Player access can be granted directly from the prompt and is also shown near the top of Malmark.
+
+Unmatched titles now try a few shorter searches. The first search with results is prefilled with its candidates; when no search succeeds, the full title stays prefilled. Automatic selection still requires a matching title or alias, and sequel/part markers are retained.
+
 Firefox now requires desktop version 142 or later.
 
 Fixed custom website setup requiring a second click after granting domain access. The picker now continues from the background even if the browser closes Malmark's popup during the permission prompt.
