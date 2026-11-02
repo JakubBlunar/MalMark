@@ -130,7 +130,13 @@ export function startPicker(
       return;
     }
     error.textContent = '';
-    const selector = selectorFor(event.target);
+    let selector: string;
+    try {
+      selector = selectorFor(event.target);
+    } catch (e) {
+      error.textContent = (e as Error).message;
+      return;
+    }
     if (step === 0) {
       titleSelector = selector;
       preview.replaceChildren();

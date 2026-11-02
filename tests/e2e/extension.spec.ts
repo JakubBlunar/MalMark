@@ -251,7 +251,7 @@ test('per-domain picker survives unrelated episode URLs', async () => {
     await context.route('https://myanimelist.net/malmark-fixture/**', (route) =>
       route.fulfill({
         contentType: 'text/html',
-        body: '<html><body style="margin:80px"><h2 id="anime-title">Cyberpunk: Edgerunners 2</h2><p>You are watching <b id="episode">Episode 8</b></p></body></html>',
+        body: '<html><body style="margin:80px"><h2 id="anime-title">Cyberpunk: Edgerunners 2</h2><div id="servers-content"><div class="ps_-status"><div class="server-notice"><strong>You are watching <b>Episode 8</b></strong></div></div></div></body></html>',
       }),
     );
     const page = await context.newPage();
@@ -265,12 +265,13 @@ test('per-domain picker survives unrelated episode URLs', async () => {
         )[0].id,
     );
     const settings = await context.newPage();
-    await settings.goto(`chrome-extension://${id}/options.html?tab=${tabId}&view=sites`);
+    await settings.goto(`chrome-extension://${id}/popup.html?tab=${tabId}&view=sites`);
     await settings.getByRole('button', { name: 'Choose elements on this page' }).click();
     await expect(page.getByRole('heading', { name: 'Pick the anime title.' })).toBeVisible();
+    await expect.poll(() => settings.isClosed()).toBe(true);
     await page.locator('#anime-title').click();
     await expect(page.getByRole('heading', { name: 'Pick the episode number.' })).toBeVisible();
-    await page.locator('#episode').click();
+    await page.locator('.server-notice b').click();
     await expect(page.getByRole('heading', { name: 'Does this look right?' })).toBeVisible();
     await page.getByRole('button', { name: 'Save website', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'You’re all set.' })).toBeVisible();
@@ -288,6 +289,12 @@ test('per-domain picker survives unrelated episode URLs', async () => {
       .toBe(8);
     await page.screenshot({ path: 'artifacts/screenshots/site-picker.png', fullPage: true });
     await page.goto('https://myanimelist.net/malmark-fixture/another-completely-different-url');
+    await page.evaluate(() => {
+      const other = document.createElement('b');
+      other.textContent = 'Episode 99';
+      document.body.prepend(other);
+      document.querySelector('.server-notice b')!.textContent = 'Episode 9';
+    });
     await expect
       .poll(
         async () =>
@@ -304,7 +311,17 @@ test('per-domain picker survives unrelated episode URLs', async () => {
       async () => (await (globalThis as any).chrome.storage.local.get('sites')).sites[0],
     );
     expect(site.titleSelector).toBe('#anime-title');
-    expect(site.episodeSelector).toBe('#episode');
+    expect(site.episodeSelector).toContain('.server-notice');
+    await expect
+      .poll(async () =>
+        worker.evaluate(
+          async (tabId) =>
+            (await (globalThis as any).chrome.storage.session.get(`tab:${tabId}`))[`tab:${tabId}`]
+              ?.detection?.episode,
+          tabId,
+        ),
+      )
+      .toBe(9);
   } finally {
     await context.close();
     if (!profile.startsWith(root + sep)) throw new Error('Unsafe test profile path');

@@ -64,9 +64,20 @@ export async function revokePlayer(origin: string): Promise<void> {
 
 export async function setupWebsite(url: string, tabId: number): Promise<void> {
   const origin = new URL(url).origin;
-  const granted = await browser.permissions.request({ origins: [origin + '/*'] });
-  if (!granted) throw new Error('Website access was not granted. No selectors were saved.');
-  await request({ type: 'START_SETUP', tabId });
+  const requestId = crypto.randomUUID();
+  // Dispatch intent before the native prompt can close the popup. Do not await here:
+  // permissions.request must still run directly in this click's user gesture.
+  const prepared = request({ type: 'PREPARE_SETUP', tabId, url, requestId });
+  try {
+    const [, granted] = await Promise.all([
+      prepared,
+      browser.permissions.request({ origins: [origin + '/*'] }),
+    ]);
+    if (!granted) throw new Error('Website access was not granted. No selectors were saved.');
+  } catch (error) {
+    await request({ type: 'CANCEL_SETUP', tabId, requestId }).catch(() => undefined);
+    throw error;
+  }
   if (location.pathname.endsWith('popup.html')) window.close();
 }
 

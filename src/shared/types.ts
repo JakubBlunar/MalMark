@@ -180,6 +180,8 @@ export type Message =
 export type SetupMessage =
   | { type: 'GET_SITE_CONFIG' }
   | { type: 'START_SETUP'; tabId: number }
+  | { type: 'PREPARE_SETUP'; tabId: number; url: string; requestId: string }
+  | { type: 'CANCEL_SETUP'; tabId: number; requestId: string }
   | { type: 'SAVE_SITE_CONFIG'; nonce: string; titleSelector: string; episodeSelector: string }
   | { type: 'REMOVE_SITE_CONFIG'; id: string };
 

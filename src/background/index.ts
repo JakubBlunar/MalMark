@@ -26,6 +26,7 @@ import {
   setSession,
 } from './storage';
 import { configForUrl, registerSite, retireLegacyAccess, supportedUrl } from './sites';
+import { cancelSiteSetup, prepareSiteSetup, resumeSiteSetups, startSiteSetup } from './site-setup';
 import { chromiumSidePanel } from '../shared/sidebar';
 import { OAUTH_SETUP_REQUIRED } from '../shared/config';
 import { inlinePromptContext, inlinePromptNonce } from './inline-prompts';
@@ -785,31 +786,12 @@ async function uiMessage(message: Message): Promise<unknown> {
       return recheck(message.tabId);
     case 'INJECT_PLAYERS':
       return injectPlayers(message.tabId);
-    case 'START_SETUP': {
-      const tab = await browser.tabs.get(message.tabId);
-      if (!tab.url || new URL(tab.url).protocol !== 'https:')
-        throw new Error(
-          'Open an HTTPS anime watch page, then start website setup from its Malmark popup.',
-        );
-      const origin = new URL(tab.url).origin;
-      if (!(await browser.permissions.contains({ origins: [origin + '/*'] })))
-        throw new Error('Allow access to this domain first.');
-      const nonce = crypto.randomUUID();
-      await browser.storage.session.set({
-        [`setup:${message.tabId}`]: { nonce, origin, expiresAt: Date.now() + 600000 },
-      });
-      await browser.scripting.executeScript({
-        target: { tabId: message.tabId, frameIds: [0] },
-        files: ['content.js'],
-      });
-      await browser.tabs.sendMessage(
-        message.tabId,
-        { type: 'START_PICKER', nonce },
-        { frameId: 0 },
-      );
-      await browser.tabs.update(message.tabId, { active: true });
-      return;
-    }
+    case 'START_SETUP':
+      return startSiteSetup(message.tabId);
+    case 'PREPARE_SETUP':
+      return prepareSiteSetup(message.tabId, message.url, message.requestId);
+    case 'CANCEL_SETUP':
+      return cancelSiteSetup(message.tabId, message.requestId);
     case 'REMOVE_SITE_CONFIG': {
       const sites = await getSites();
       const site = sites.find((s) => s.id === message.id);
@@ -1003,8 +985,21 @@ browser.runtime.onMessage.addListener((raw: unknown, sender: browser.Runtime.Mes
 browser.tabs.onRemoved.addListener((tabId) => {
   recovery.delete(tabId);
   void serialized(() =>
-    browser.storage.session.remove([`tab:${tabId}`, `inlinePrompt:${tabId}`, `notice:${tabId}`]),
+    browser.storage.session.remove([
+      `tab:${tabId}`,
+      `inlinePrompt:${tabId}`,
+      `notice:${tabId}`,
+      `setup:${tabId}`,
+      `setupPending:${tabId}`,
+    ]),
   );
+});
+
+browser.permissions.onAdded.addListener((permissions) => {
+  if (permissions.origins?.length)
+    return serialized(resumeSiteSetups).catch((error) =>
+      console.error('Website setup failed:', error),
+    );
 });
 
 browser.webNavigation.onHistoryStateUpdated.addListener((details) => {

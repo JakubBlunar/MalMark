@@ -62,6 +62,7 @@ const mock = vi.hoisted(() => {
       getAll: vi.fn(async () => ({ origins: [] })),
       contains: vi.fn(async () => false),
       remove: vi.fn(),
+      onAdded: { addListener: vi.fn() },
     },
     scripting: {
       executeScript: vi.fn(),
@@ -132,6 +133,8 @@ const updatedListener = mock.browser.tabs.onUpdated.addListener.mock.calls[0][0]
 ) => void;
 const historyListener = mock.browser.webNavigation.onHistoryStateUpdated.addListener.mock
   .calls[0][0] as (details: { tabId: number; frameId: number; url: string }) => void;
+const permissionsAdded = mock.browser.permissions.onAdded.addListener.mock
+  .calls[0][0] as (permissions: { origins?: string[] }) => Promise<void>;
 async function message<T = unknown>(
   value: unknown,
   sender: Record<string, unknown> = ui,
@@ -1925,6 +1928,76 @@ describe('website setup authorization', () => {
       expect.objectContaining({ type: 'START_PICKER' }),
       { frameId: 0 },
     );
+  });
+  it('opens a queued picker on permission grant without any popup continuation', async () => {
+    mock.browser.tabs.sendMessage.mockClear();
+    expect(
+      (await message({ type: 'PREPARE_SETUP', tabId: 1, url: content.url, requestId: 'click' })).ok,
+    ).toBe(true);
+    expect(mock.getSession()['setupPending:1']).toBeDefined();
+    expect(mock.browser.tabs.sendMessage).not.toHaveBeenCalled();
+    // Only the browser event remains after the popup closes.
+    mock.browser.permissions.contains.mockResolvedValue(true);
+    await permissionsAdded({ origins: ['https://www.crunchyroll.com/*'] });
+    expect(mock.browser.tabs.sendMessage).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ type: 'START_PICKER' }),
+      { frameId: 0 },
+    );
+    expect(mock.getSession()['setupPending:1']).toBeUndefined();
+    const count = mock.browser.tabs.sendMessage.mock.calls.length;
+    await permissionsAdded({ origins: ['https://other.example/*'] });
+    expect(mock.browser.tabs.sendMessage).toHaveBeenCalledTimes(count);
+  });
+  it('handles access granted before the setup intent reaches the background', async () => {
+    mock.browser.permissions.contains.mockResolvedValue(true);
+    mock.browser.tabs.sendMessage.mockClear();
+    await permissionsAdded({ origins: ['https://www.crunchyroll.com/*'] });
+    expect(
+      (
+        await message({
+          type: 'PREPARE_SETUP',
+          tabId: 1,
+          url: content.url,
+          requestId: 'fast-grant',
+        })
+      ).ok,
+    ).toBe(true);
+    expect(mock.browser.tabs.sendMessage).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ type: 'START_PICKER' }),
+      { frameId: 0 },
+    );
+    expect(mock.getSession()['setupPending:1']).toBeUndefined();
+  });
+  it('does not start pending setup for an unrelated permission', async () => {
+    mock.browser.tabs.sendMessage.mockClear();
+    await message({ type: 'PREPARE_SETUP', tabId: 1, url: content.url, requestId: 'click' });
+    await permissionsAdded({ origins: ['https://other.example/*'] });
+    expect(mock.browser.tabs.sendMessage).not.toHaveBeenCalled();
+    expect(mock.getSession()['setupPending:1']).toBeDefined();
+  });
+  it.each(['navigation', 'expiry', 'denial'])('discards pending setup after %s', async (reason) => {
+    mock.browser.tabs.sendMessage.mockClear();
+    await message({ type: 'PREPARE_SETUP', tabId: 1, url: content.url, requestId: 'click' });
+    if (reason === 'navigation')
+      mock.browser.tabs.get.mockResolvedValue({
+        id: 1,
+        url: 'https://www.crunchyroll.com/watch/other',
+      });
+    if (reason === 'expiry')
+      (mock.getSession()['setupPending:1'] as { expiresAt: number }).expiresAt = Date.now() - 1;
+    if (reason === 'denial') await message({ type: 'CANCEL_SETUP', tabId: 1, requestId: 'click' });
+    mock.browser.permissions.contains.mockResolvedValue(true);
+    await permissionsAdded({ origins: ['https://www.crunchyroll.com/*'] });
+    expect(mock.browser.tabs.sendMessage).not.toHaveBeenCalled();
+    expect(mock.getSession()['setupPending:1']).toBeUndefined();
+  });
+  it('rejects setup intent from content scripts and stale popup URLs', async () => {
+    const prepare = { type: 'PREPARE_SETUP', tabId: 1, url: content.url, requestId: 'click' };
+    expect((await message(prepare, content)).ok).toBe(false);
+    expect((await message({ ...prepare, url: 'https://other.example/watch' })).ok).toBe(false);
+    expect(mock.getSession()['setupPending:1']).toBeUndefined();
   });
   it('saves only the selected domain’s config and consumes its nonce', async () => {
     mock.browser.permissions.contains.mockResolvedValue(true);

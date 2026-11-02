@@ -118,4 +118,48 @@ describe('stable selector generation', () => {
     expect(doc.querySelector(selector)).toBe(selected);
     expect(selector).toContain('#watch');
   });
+  it('anchors an initially unique bold episode label to its stable container', () => {
+    const doc = parse(
+      '<div id="servers-content"><div class="ps_-status"><div class="content"><div class="server-notice"><strong>You are watching <b>Episode 1</b></strong></div></div></div></div>',
+    );
+    const selected = doc.querySelector('b')!;
+    const selector = selectorFor(selected, doc);
+    expect(selector).not.toBe('b');
+    expect(selector).toContain('.server-notice');
+    // Other bold text may appear before the episode after page updates.
+    doc.body.insertAdjacentHTML('afterbegin', '<aside><b>Episode 99</b></aside>');
+    const notice = doc.querySelector('.server-notice')!;
+    notice.replaceChildren();
+    notice.insertAdjacentHTML(
+      'beforeend',
+      '<section><strong>Watching <b>Episode 2</b></strong></section>',
+    );
+    expect(doc.querySelectorAll(selector)).toHaveLength(1);
+    expect(doc.querySelector(selector)?.textContent).toBe('Episode 2');
+    doc.body.insertAdjacentHTML('beforeend', '<h2 id="anime-title">Cyberpunk: Edgerunners 2</h2>');
+    expect(
+      detect(doc, 'https://anime.example/next', { ...config, episodeSelector: selector })?.episode,
+    ).toBe(2);
+  });
+  it('uses semantic ancestor attributes without relying on generated IDs', () => {
+    const doc = parse('<div id="react-123456" data-testid="episode-status"><b>Episode 8</b></div>');
+    const selector = selectorFor(doc.querySelector('b')!, doc);
+    expect(selector).toBe('div[data-testid="episode-status"] b');
+  });
+  it('keeps repeated bold labels distinct within a stable container', () => {
+    const doc = parse('<main id="player"><b>Episode 8</b><b>12 episodes</b></main>');
+    const selected = doc.querySelector('b')!;
+    const selector = selectorFor(selected, doc);
+    expect(selector).toContain('#player');
+    expect(doc.querySelectorAll(selector)).toHaveLength(1);
+    expect(doc.querySelector(selector)).toBe(selected);
+  });
+  it('uses a full structural path when no semantic anchor is available', () => {
+    const doc = parse('<main><p><b>Episode 8</b></p></main>');
+    const selector = selectorFor(doc.querySelector('b')!, doc);
+    doc.body.insertAdjacentHTML('afterbegin', '<aside><b>Advertisement</b></aside>');
+    expect(selector).toContain('body > main');
+    expect(doc.querySelectorAll(selector)).toHaveLength(1);
+    expect(doc.querySelector(selector)?.textContent).toBe('Episode 8');
+  });
 });

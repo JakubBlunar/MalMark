@@ -18,6 +18,6 @@ Malmark reads anime titles, episode labels and accessible player timing on suppo
 
 A MyAnimeList account and access to streaming content are required. Crunchyroll may require a subscription. Other sites need manual setup and may not work with every player. Netflix is not built in. Malmark supplies no streaming content and does not download video.
 
-For desktop Firefox 140 or later. Independent project; not affiliated with MyAnimeList or Crunchyroll. Source available under Elastic License 2.0; dependency licenses are retained.
+For desktop Firefox 142 or later. Independent project; not affiliated with MyAnimeList or Crunchyroll. Source available under Elastic License 2.0; dependency licenses are retained.
 
 Support: https://github.com/JakubBlunar/MalMark/issues

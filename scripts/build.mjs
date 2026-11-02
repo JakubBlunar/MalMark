@@ -36,7 +36,7 @@ const scripts = await build({
   bundle: true,
   format: 'iife',
   platform: 'browser',
-  target: ['chrome121', 'firefox140'],
+  target: ['chrome121', 'firefox142'],
   minify: true,
   legalComments: 'none',
   metafile: true,
@@ -103,7 +103,9 @@ for (const target of ['firefox', 'chromium']) {
     manifest.browser_specific_settings = {
       gecko: {
         id: 'malmark@mal-episode-watcher.local',
-        strict_min_version: '140.0',
+        // The linter also uses this floor for Android when gecko_android is absent.
+        // 142 supports the consent key on both platforms; omit gecko_android to stay desktop-only.
+        strict_min_version: '142.0',
         data_collection_permissions: {
           required: ['authenticationInfo', 'browsingActivity', 'websiteContent', 'websiteActivity'],
           optional: [],
