@@ -196,6 +196,184 @@ beforeEach(async () => {
   mock.browser.webNavigation.getAllFrames.mockResolvedValue([]);
 });
 describe('OAuth and MAL transport', () => {
+  it('loads watching-list pages with progress from list_status using only authenticated reads', async () => {
+    const status = { status: 'watching', num_episodes_watched: 4, score: 8 };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        json({
+          data: [
+            { node: anime, list_status: status },
+            { node: { ...anime, id: 2 }, list_status: { ...status, status: 'completed' } },
+          ],
+          paging: { next: 'https://untrusted.example/?offset=2' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        json({
+          data: [{ node: { ...anime, id: 3, num_episodes: 0 }, list_status: status }],
+          paging: {},
+        }),
+      );
+    vi.stubGlobal('fetch', fetch);
+    const first = await message<{ items: Anime[]; nextOffset: number; accountId: number }>({
+      type: 'GET_WATCHING_LIST',
+    });
+    expect(first.ok && first.data).toEqual({
+      accountId: 5,
+      items: [{ ...anime, my_list_status: status }],
+      nextOffset: 2,
+    });
+    const second = await message<{ items: Anime[]; nextOffset?: number }>({
+      type: 'GET_WATCHING_LIST',
+      offset: 2,
+    });
+    expect(second.ok && second.data.items[0].id).toBe(3);
+    expect(second.ok && second.data.nextOffset).toBeUndefined();
+    for (const [index, [url, options]] of fetch.mock.calls.entries()) {
+      const parsed = new URL(url);
+      expect(parsed.origin).toBe('https://api.myanimelist.net');
+      expect(parsed.pathname).toBe('/v2/users/@me/animelist');
+      expect(parsed.searchParams.get('status')).toBe('watching');
+      expect(parsed.searchParams.get('sort')).toBe('list_updated_at');
+      expect(parsed.searchParams.get('limit')).toBe('100');
+      expect(parsed.searchParams.get('offset')).toBe(index ? '2' : '0');
+      expect(parsed.searchParams.get('fields')).toContain('list_status');
+      expect(parsed.searchParams.get('nsfw')).toBe('true');
+      expect(options.headers.Authorization).toBe('Bearer access');
+      expect(options.method).toBeUndefined();
+    }
+    await message({ type: 'GET_STATE' });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it.each([-1, 1.5, NaN, 100001])('rejects invalid watching-list offset %s', async (offset) => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    expect((await message({ type: 'GET_WATCHING_LIST', offset })).ok).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('rejects watching-list reads from streaming pages', async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    expect((await message({ type: 'GET_WATCHING_LIST' }, content)).ok).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it.each(['logout', 'account-switch', 'duplicate'])(
+    'handles %s during a watching-list request without blocking state reads',
+    async (change) => {
+      let finish!: (response: Response) => void;
+      const fetch = vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            finish = resolve;
+          }),
+      );
+      vi.stubGlobal('fetch', fetch);
+      const pending = message({ type: 'GET_WATCHING_LIST' });
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+      expect((await message({ type: 'GET_STATE' })).ok).toBe(true);
+      let duplicate: Promise<Reply<unknown>> | undefined;
+      if (change === 'logout') await message({ type: 'LOGOUT' });
+      if (change === 'account-switch')
+        await mock.browser.storage.local.set({
+          auth: { ...auth, profile: { id: 6, name: 'other' } },
+        });
+      if (change === 'duplicate') duplicate = message({ type: 'GET_WATCHING_LIST' });
+      finish(json({ data: [], paging: {} }));
+      expect((await pending).ok).toBe(change === 'duplicate');
+      if (duplicate) expect((await duplicate).ok).toBe(true);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
+  it('refreshes and persists profile statistics without another sign-in or snapshot network requests', async () => {
+    const profile = {
+      id: 5,
+      name: 'viewer',
+      anime_statistics: {
+        num_items_watching: 7,
+        num_items_completed: 24,
+        num_episodes: 1234,
+        num_days_watched: 12.5,
+      },
+    };
+    const fetch = vi.fn().mockResolvedValue(json(profile));
+    vi.stubGlobal('fetch', fetch);
+    const reply = await message({ type: 'REFRESH_PROFILE' });
+    expect(reply).toEqual({ ok: true, data: profile });
+    expect(mock.getLocal().auth).toEqual({ ...auth, profile });
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.myanimelist.net/v2/users/@me?fields=anime_statistics',
+      expect.objectContaining({ headers: { Authorization: 'Bearer access' } }),
+    );
+    expect(mock.browser.identity.launchWebAuthFlow).not.toHaveBeenCalled();
+    const snapshot = await message<{ profile: unknown }>({ type: 'GET_STATE' });
+    expect(snapshot.ok && snapshot.data.profile).toEqual(profile);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('keeps saved profile statistics when refreshing fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({}, 503)));
+    expect((await message({ type: 'REFRESH_PROFILE' })).ok).toBe(false);
+    expect(mock.getLocal().auth).toEqual(auth);
+  });
+  it('shares simultaneous profile refreshes', async () => {
+    let finish!: (response: Response) => void;
+    const fetch = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    vi.stubGlobal('fetch', fetch);
+    const first = message({ type: 'REFRESH_PROFILE' });
+    const second = message({ type: 'REFRESH_PROFILE' });
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    finish(json(auth.profile));
+    expect((await first).ok).toBe(true);
+    expect((await second).ok).toBe(true);
+  });
+  it.each(['logout', 'account', 'token-rotation'])(
+    'handles %s while a profile refresh is pending',
+    async (change) => {
+      let finish!: (response: Response) => void;
+      const fetch = vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            finish = resolve;
+          }),
+      );
+      vi.stubGlobal('fetch', fetch);
+      const pending = message({ type: 'REFRESH_PROFILE' });
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+      // Profile network I/O must not hold up ordinary state reads or logout.
+      expect((await message({ type: 'GET_STATE' })).ok).toBe(true);
+      if (change === 'logout') await message({ type: 'LOGOUT' });
+      else
+        await mock.browser.storage.local.set({
+          auth: {
+            ...auth,
+            accessToken: 'rotated-access',
+            refreshToken: 'rotated-refresh',
+            profile: change === 'account' ? { id: 6, name: 'someone-else' } : auth.profile,
+          },
+        });
+      finish(json({ ...auth.profile, location: 'Updated location' }));
+      const reply = await pending;
+      expect(reply.ok).toBe(change === 'token-rotation');
+      if (change === 'logout') expect(mock.getLocal().auth).toBeUndefined();
+      else {
+        const current = mock.getLocal().auth as Auth;
+        expect(current.accessToken).toBe('rotated-access');
+        expect(current.refreshToken).toBe('rotated-refresh');
+        expect(current.profile?.id).toBe(change === 'account' ? 6 : 5);
+      }
+    },
+  );
+  it('rejects profile refresh requests from streaming pages', async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    expect((await message({ type: 'REFRESH_PROFILE' }, content)).ok).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it('requires personal API setup for unpacked builds, without changing an existing login', async () => {
     mock.setupRequired = true;
     const snapshot = await message<{ connected: boolean; oauth: unknown; redirectUrl: string }>({

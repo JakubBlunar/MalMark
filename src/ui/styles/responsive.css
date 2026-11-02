@@ -5,6 +5,17 @@
   font-size: 11px;
 }
 @media (max-width: 400px) {
+  .full-page .header {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .full-page .brand > span:last-child {
+    font-size: 21px;
+  }
+  .full-page .brand small {
+    font-size: 8px;
+    letter-spacing: 0.8px;
+  }
   .full-page .navigation > button {
     padding: 9px 4px;
     gap: 5px;

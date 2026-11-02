@@ -63,6 +63,10 @@
   background: #2b2e3d;
   color: #ececf7;
 }
+.icon-button.selected {
+  background: #302a41;
+  color: var(--accent);
+}
 .avatar {
   position: relative;
   width: 33px;

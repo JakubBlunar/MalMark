@@ -75,6 +75,9 @@ test('built Chromium extension detects a supported page and serves its popup', a
         my_list_status: { status: 'watching', num_episodes_watched: 1, score: 9 },
       };
       root.testAnime = anime;
+      root.profileLoads = 0;
+      root.profileEpisodes = 1000;
+      root.profileFailure = false;
       root.fetch = async (url: string, options: any = {}) => {
         if (url === 'https://myanimelist.net/v1/oauth2/token') {
           root.testTokenBody = options.body;
@@ -86,8 +89,22 @@ test('built Chromium extension detects a supported page and serves its popup', a
             }),
           );
         }
-        if (url.includes('/users/@me'))
-          return new Response(JSON.stringify({ id: 5, name: 'fixture-user' }));
+        if (url.includes('/users/@me')) {
+          root.profileLoads++;
+          if (root.profileFailure) return new Response('{}', { status: 503 });
+          return new Response(
+            JSON.stringify({
+              id: 5,
+              name: 'fixture-user',
+              anime_statistics: {
+                num_items_watching: 7,
+                num_items_completed: 24,
+                num_episodes: root.profileEpisodes,
+                num_days_watched: 12.5,
+              },
+            }),
+          );
+        }
         if (url.includes('/anime?'))
           return new Response(JSON.stringify({ data: [{ node: anime }] }));
         if (options.method === 'PATCH') {
@@ -155,7 +172,31 @@ test('built Chromium extension detects a supported page and serves its popup', a
     ]);
     expect(errors).toEqual([]);
     await popup.screenshot({ path: 'artifacts/screenshots/real-extension.png', fullPage: true });
+    await worker.evaluate(() => {
+      (globalThis as any).profileEpisodes = 2222;
+    });
     await popup.getByRole('button', { name: 'Open profile' }).click();
+    await expect(popup.locator('.stats-grid')).toContainText('2,222');
+    await expect(
+      popup.getByText('Statistics refreshed from MyAnimeList.', { exact: true }),
+    ).toBeVisible();
+    await popup.waitForTimeout(2200);
+    expect(await worker.evaluate(() => (globalThis as any).profileLoads)).toBe(2);
+    await popup.getByRole('button', { name: /^Watching/ }).click();
+    await worker.evaluate(() => {
+      (globalThis as any).profileFailure = true;
+    });
+    await popup.getByRole('button', { name: 'Open profile' }).click();
+    await expect(popup.getByRole('alert')).toContainText('Showing saved statistics');
+    await expect(popup.locator('.stats-grid')).toContainText('2,222');
+    await worker.evaluate(() => {
+      const root = globalThis as any;
+      root.profileFailure = false;
+      root.profileEpisodes = 3333;
+    });
+    await popup.getByRole('button', { name: 'Try again', exact: true }).click();
+    await expect(popup.locator('.stats-grid')).toContainText('3,333');
+    expect(await worker.evaluate(() => (globalThis as any).profileLoads)).toBe(4);
     await popup.getByRole('button', { name: 'Disconnect account', exact: true }).click();
     await expect(
       popup.getByRole('button', { name: 'Connect MyAnimeList', exact: true }),

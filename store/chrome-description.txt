@@ -7,8 +7,11 @@ Watch anime on Crunchyroll, check the detected anime and episode, and confirm wh
 • Resume partial episode progress after closing the browser.
 • Review queued episode reminders even after autoplay moves on.
 • Adjust your watched episode count manually.
+• Browse your Currently Watching list with English/original titles, episode progress and links to MAL.
+• Refresh profile statistics when opening your profile, without signing in again.
 • Mark Finished Airing entries completed and optionally give them a score after the final episode.
 • Add other HTTPS websites yourself by choosing their title and episode elements and granting access to that domain.
+• Fine-tune saved CSS selectors and test them on a watch page. On-page prompts help with unmatched titles and new player permissions.
 
 Updates ask for confirmation by default. Optionally enable automatic progress for exactly the next episode after your saved count, or episode 1 of a new title. It checks fresh MAL progress and shows a four-second success notice. New titles are added to Currently Watching and Plan to Watch titles move there. Completed and Dropped keep their status; fully logged titles stay untouched during a rewatch. Gaps, On Hold titles and failed updates ask for confirmation. Completion and scoring remain manual. You can also enable automatic finish dates to fill a missing date when you mark an anime Completed; existing dates are preserved. Sign in through MyAnimeList; store installations use Malmark’s public app registration and do not require you to create an API app.
 

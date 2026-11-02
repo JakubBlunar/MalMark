@@ -51,6 +51,12 @@ export interface Profile {
   };
 }
 
+export interface WatchingListPage {
+  accountId: number;
+  items: Anime[];
+  nextOffset?: number;
+}
+
 export interface Settings {
   autoProgress: boolean;
   autoFinishDate: boolean;
@@ -155,6 +161,8 @@ export type Message =
   | { type: 'DETECTION'; detection: Detection | null; pageUrl: string; frameOrigins: string[] }
   | { type: 'PLAYBACK'; playback: Playback; pageUrl: string }
   | { type: 'GET_STATE'; tabId?: number }
+  | { type: 'REFRESH_PROFILE' }
+  | { type: 'GET_WATCHING_LIST'; offset?: number }
   | { type: 'CONNECT' }
   | { type: 'SAVE_OAUTH_CLIENT'; clientId: string }
   | { type: 'LOGOUT' }

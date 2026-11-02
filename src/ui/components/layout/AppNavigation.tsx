@@ -1,4 +1,4 @@
-import { Globe2, Link2, Settings2, ShieldCheck, TvMinimal, UserRound } from 'lucide-react';
+import { Globe2, Link2, ListVideo, ShieldCheck, TvMinimal, UserRound } from 'lucide-react';
 import type { View, Navigate } from '../../types';
 import { fullPage } from '../../lib/surface';
 
@@ -26,9 +26,9 @@ export function AppNavigation({
         <Globe2 size={16} />
         <span>Sites</span>
       </button>
-      <button className={view === 'settings' ? 'active' : ''} onClick={() => go('settings')}>
-        <Settings2 size={16} />
-        <span>Settings</span>
+      <button className={view === 'list' ? 'active' : ''} onClick={() => go('list')}>
+        <ListVideo size={16} />
+        <span>My list</span>
       </button>
       {fullPage && (
         <button

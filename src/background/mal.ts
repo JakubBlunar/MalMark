@@ -1,6 +1,6 @@
 import browser from 'webextension-polyfill';
-import type { Anime, Auth, ListStatus, Profile } from '../shared/types';
-import { getAuth, getLoginClientId } from './storage';
+import type { Anime, Auth, ListStatus, Profile, WatchingListPage } from '../shared/types';
+import { getAuth, getLoginClientId, serialized } from './storage';
 import { OAUTH_SETUP_REQUIRED } from '../shared/config';
 
 export const API = 'https://api.myanimelist.net/v2';
@@ -106,7 +106,7 @@ async function refresh(auth: Auth): Promise<Auth> {
       const current = await getAuth();
       if (!current || current.refreshToken !== auth.refreshToken)
         throw new Error('Account changed. Please try again.');
-      fresh.profile = auth.profile;
+      fresh.profile = current.profile;
       await browser.storage.local.set({ auth: fresh });
       return fresh;
     } catch (error) {
@@ -216,9 +216,102 @@ export function authorizationCode(callback: string, redirect: string, state: str
 
 let authGeneration = 0;
 let connecting = false;
+const watchingTasks = new Map<string, Promise<WatchingListPage>>();
+
+export async function getWatchingList(offset = 0): Promise<WatchingListPage> {
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000)
+    throw new Error('Invalid watching-list page. Refresh your list and try again.');
+  const generation = authGeneration;
+  const auth = await getAuth();
+  if (!auth?.profile) throw new Error('Connect your MyAnimeList account first.');
+  const accountId = auth.profile.id;
+  const key = `${generation}:${auth.clientId}:${accountId}:${offset}`;
+  const existing = watchingTasks.get(key);
+  if (existing) return existing;
+  const task = (async () => {
+    const params = new URLSearchParams({
+      status: 'watching',
+      sort: 'list_updated_at',
+      limit: '100',
+      offset: String(offset),
+      nsfw: 'true',
+      fields: 'alternative_titles,num_episodes,media_type,list_status',
+    });
+    const page = await request<{
+      data: { node: Anime; list_status: ListStatus }[];
+      paging?: { next?: string };
+    }>(`/users/@me/animelist?${params}`);
+    const current = await getAuth();
+    if (
+      generation !== authGeneration ||
+      current?.profile?.id !== accountId ||
+      current.clientId !== auth.clientId
+    )
+      throw new Error('Account changed. Open your list again to refresh it.');
+    return {
+      accountId,
+      items: page.data
+        .filter((entry) => entry.list_status?.status === 'watching')
+        .map(({ node, list_status }) => ({ ...node, my_list_status: list_status })),
+      // Reconstruct our own requests rather than following a response URL with credentials.
+      nextOffset: page.paging?.next && page.data.length ? offset + page.data.length : undefined,
+    };
+  })();
+  watchingTasks.set(key, task);
+  try {
+    return await task;
+  } finally {
+    if (watchingTasks.get(key) === task) watchingTasks.delete(key);
+  }
+}
 
 export function cancelLogin(): void {
   authGeneration++;
+}
+
+let profileTask:
+  { generation: number; accountId?: number; clientId: string; task: Promise<Profile> } | undefined;
+
+export async function refreshProfile(): Promise<Profile> {
+  const generation = authGeneration;
+  const auth = await getAuth();
+  if (!auth) throw new Error('Connect your MyAnimeList account first.');
+  if (
+    profileTask?.generation === generation &&
+    profileTask.accountId === auth.profile?.id &&
+    profileTask.clientId === auth.clientId
+  )
+    return profileTask.task;
+  const entry = {
+    generation,
+    accountId: auth.profile?.id,
+    clientId: auth.clientId,
+    task: (async () => {
+      const profile = await request<Profile>('/users/@me?fields=anime_statistics');
+      if (!Number.isSafeInteger(profile.id) || profile.id <= 0 || typeof profile.name !== 'string')
+        throw new Error('MyAnimeList returned an invalid profile.');
+      return serialized(async () => {
+        const current = await getAuth();
+        if (
+          !current ||
+          generation !== authGeneration ||
+          current.clientId !== auth.clientId ||
+          current.profile?.id !== auth.profile?.id ||
+          (auth.profile && profile.id !== auth.profile.id)
+        )
+          throw new Error('Account changed. Open your profile again to refresh it.');
+        // Token refresh may have rotated credentials while the profile request ran.
+        await browser.storage.local.set({ auth: { ...current, profile } });
+        return profile;
+      });
+    })(),
+  };
+  profileTask = entry;
+  try {
+    return await entry.task;
+  } finally {
+    if (profileTask === entry) profileTask = undefined;
+  }
 }
 
 export async function connect(): Promise<void> {

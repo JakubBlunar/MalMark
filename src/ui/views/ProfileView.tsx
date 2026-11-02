@@ -9,6 +9,8 @@ import {
   UserRound,
 } from 'lucide-react';
 import type { ViewProps } from '../types';
+import type { Profile } from '../../shared/types';
+import { inExtension, request } from '../services/extension';
 
 export function ProfileView({
   state,
@@ -16,7 +18,32 @@ export function ProfileView({
   act,
   signIn,
 }: ViewProps & { signIn: () => Promise<void> }) {
-  const stats = state.profile?.anime_statistics;
+  const [freshProfile, setFreshProfile] = useState<Profile>();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!inExtension || !state.connected) return;
+    let active = true;
+    setLoading(true);
+    setError('');
+    setFreshProfile(undefined);
+    void request<Profile>({ type: 'REFRESH_PROFILE' })
+      .then((profile) => {
+        if (active) setFreshProfile(profile);
+      })
+      .catch((error) => {
+        if (active) setError((error as Error).message);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [state.connected, state.profile?.id, attempt]);
+  const profile = freshProfile?.id === state.profile?.id ? freshProfile : state.profile;
+  const stats = profile?.anime_statistics;
   return (
     <>
       <div className="page-title">
@@ -24,25 +51,21 @@ export function ProfileView({
         <h1>Profile</h1>
         <p>Your MyAnimeList account, at a glance.</p>
       </div>
-      {state.profile ? (
+      {profile ? (
         <>
           <section className="card profile-card">
             <div className="profile-avatar">
-              {state.profile.picture ? (
-                <img src={state.profile.picture} alt="" />
-              ) : (
-                <UserRound size={32} />
-              )}
+              {profile.picture ? <img src={profile.picture} alt="" /> : <UserRound size={32} />}
             </div>
-            <h2>{state.profile.name}</h2>
+            <h2>{profile.name}</h2>
             <span className="connected-label">
               <i /> Connected to MyAnimeList
             </span>
-            {state.profile.location && <p>{state.profile.location}</p>}
-            {state.profile.joined_at && (
+            {profile.location && <p>{profile.location}</p>}
+            {profile.joined_at && (
               <p className="helper">
                 Member since{' '}
-                {new Date(state.profile.joined_at).toLocaleDateString(undefined, {
+                {new Date(profile.joined_at).toLocaleDateString(undefined, {
                   month: 'long',
                   year: 'numeric',
                 })}
@@ -50,7 +73,7 @@ export function ProfileView({
             )}
             <a
               className="button secondary"
-              href={`https://myanimelist.net/profile/${encodeURIComponent(state.profile.name)}`}
+              href={`https://myanimelist.net/profile/${encodeURIComponent(profile.name)}`}
               target="_blank"
               rel="noreferrer"
             >
@@ -81,7 +104,27 @@ export function ProfileView({
               </div>
             </div>
           )}
-          <p className="helper centered">Statistics reflect your most recent sign-in.</p>
+          <div className="helper centered" aria-live="polite">
+            {error ? (
+              <>
+                <p role="alert">Couldn’t refresh your profile. Showing saved statistics. {error}</p>
+                <button
+                  className="text-button"
+                  onClick={() => setAttempt((attempt) => attempt + 1)}
+                >
+                  Try again
+                </button>
+              </>
+            ) : (
+              <p>
+                {loading
+                  ? 'Refreshing statistics…'
+                  : freshProfile
+                    ? 'Statistics refreshed from MyAnimeList.'
+                    : 'Statistics refresh when you open your profile.'}
+              </p>
+            )}
+          </div>
           <button
             disabled={!!busy}
             className="button danger wide"
@@ -111,3 +154,4 @@ export function ProfileView({
     </>
   );
 }
+import { useEffect, useState } from 'react';

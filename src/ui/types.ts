@@ -1,5 +1,5 @@
 import type { Message, PublicState } from '../shared/types';
-export type View = 'watching' | 'matches' | 'sites' | 'settings' | 'profile';
+export type View = 'watching' | 'list' | 'matches' | 'sites' | 'settings' | 'profile';
 export type Navigate = (view: View) => void;
 export type Act = (
   key: string,

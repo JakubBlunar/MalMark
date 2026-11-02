@@ -15,6 +15,7 @@ A browser extension for Chrome, Brave and Firefox that detects the anime you’r
 - Complete and optionally score finished-airing anime after the final episode.
 - Enable **Set finish date automatically** in Settings to fill a missing MAL finish date with your local calendar date when marking an anime Completed. Existing dates are preserved; ordinary episode logging does not change dates.
 - A selector picker and editable CSS selectors for websites you choose to add, with permission per domain. Fine-tune selectors in the picker or under Sites → Your websites → Edit selectors.
+- A My list overview of your Currently Watching titles and episode progress, with a link to your full MyAnimeList list.
 
 GitHub downloads start with API setup: create a MyAnimeList app of type **Other**, register the exact redirect URL shown by Malmark, and paste its public client ID. Then sign in, open an episode, and confirm updates when ready. Use **Open sidebar** in the header to keep Malmark beside your video. The sidebar follows the active tab.
 

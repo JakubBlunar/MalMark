@@ -8,8 +8,11 @@ Features
 • Partial progress saved across browser restarts, with automatic cleanup after 30 days and a 100-episode limit.
 • Episode reminders that stay queued after autoplay.
 • Manual watched-count controls.
+• A Currently Watching overview with English/original titles, episode progress and links to your full MAL list.
+• Profile statistics refreshed when opening your profile.
 • Optional completion and scoring for Finished Airing anime after the last episode.
 • A selector picker for other HTTPS websites you choose to add, with access granted per domain.
+• Editable CSS selectors with watch-page previews, plus on-page help for unmatched titles and new player permissions.
 
 Updates ask for confirmation by default. Optionally enable automatic progress for exactly the next episode after your saved count, or episode 1 of a new title. It checks fresh MAL progress and shows a four-second success notice. New titles are added to Currently Watching and Plan to Watch titles move there. Completed and Dropped keep their status; fully logged titles stay untouched during a rewatch. Gaps, On Hold titles and failed updates ask for confirmation. Completion and scoring remain manual. You can also enable automatic finish dates to fill a missing date when you mark an anime Completed; existing dates are preserved. Store users sign in through MyAnimeList without creating an API application.
 

@@ -1,8 +1,8 @@
 import logo from '../../../assets/logo.svg';
-import { ExternalLink, PanelRightOpen, UserRound } from 'lucide-react';
+import { ExternalLink, PanelRightOpen, Settings2, UserRound } from 'lucide-react';
 import type { Profile } from '../../../shared/types';
 import type { View, Act, Navigate } from '../../types';
-import { inExtension, openSettings } from '../../services/extension';
+import { inExtension, openFullView } from '../../services/extension';
 import { sidebar } from '../../lib/surface';
 
 export function AppHeader({
@@ -53,11 +53,22 @@ export function AppHeader({
           {sidebar && connected && (
             <button
               className="icon-button expand"
-              title="Open full settings"
-              aria-label="Open full settings"
-              onClick={() => void act('open', openSettings)}
+              title="Expand Malmark"
+              aria-label="Expand Malmark"
+              onClick={() => void act('open', () => openFullView(view, tabId))}
             >
               <ExternalLink size={16} />
+            </button>
+          )}
+          {connected && (
+            <button
+              className={`icon-button ${view === 'settings' ? 'selected' : ''}`}
+              title="Settings"
+              aria-label="Settings"
+              aria-pressed={view === 'settings'}
+              onClick={() => go('settings')}
+            >
+              <Settings2 size={18} />
             </button>
           )}
           {connected && (

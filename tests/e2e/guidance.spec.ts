@@ -133,9 +133,21 @@ test('on-page help offers shorter search results and immediate player access', a
       'https://player.example/*',
     ]);
     await player.getByRole('button', { name: 'Later', exact: true }).click();
+    // Assert the visible UI and saved dismissal, not asynchronous browser-frame cleanup.
+    await expect(page.locator('[data-malmark-prompt]')).toHaveCount(0);
     await expect
-      .poll(() => page.frames().filter((frame) => frame.url().includes('/prompt.html#')).length)
-      .toBe(0);
+      .poll(() =>
+        worker.evaluate(async () => {
+          const entries = await (globalThis as any).chrome.storage.session.get(null);
+          return Object.entries(entries).some(
+            ([key, value]) =>
+              key.startsWith('guidanceDismissed:') &&
+              Array.isArray(value) &&
+              value.includes('player:https://player.example'),
+          );
+        }),
+      )
+      .toBe(true);
     await page.goto('https://www.crunchyroll.com/watch/missing');
     const empty = await promptFrame(page, 'Find the right anime');
     const emptyPage = context.waitForEvent('page');

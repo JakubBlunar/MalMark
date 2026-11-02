@@ -136,7 +136,7 @@ test('sidebar adapts to narrow and wide panels with all screens available', asyn
   await expect(page.getByRole('button', { name: 'Open sidebar', exact: true })).toHaveCount(0);
   for (const width of [320, 360, 480]) {
     await page.setViewportSize({ width, height: 850 });
-    for (const name of ['Watching', 'Matches', 'Sites', 'Settings']) {
+    for (const name of ['Watching', 'My list', 'Matches', 'Sites', 'Settings']) {
       await page.getByRole('button', { name, exact: true }).click();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
@@ -152,4 +152,39 @@ test('sidebar adapts to narrow and wide panels with all screens available', asyn
   await page.getByRole('button', { name: 'Watching', exact: true }).click();
   await page.screenshot({ path: 'artifacts/screenshots/sidebar-watching.png', fullPage: true });
   expect(errors).toEqual([]);
+});
+
+test('My list shows episode progress and Settings lives beside the header controls', async ({
+  page,
+}) => {
+  await page.goto('/options.html?demo=watching&view=list');
+  await expect(
+    page.getByRole('heading', { name: 'Currently watching', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('navigation').getByRole('button', { name: 'Settings', exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.locator('.header-actions').getByRole('button', { name: 'Settings', exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('.my-list-item')).toHaveCount(3);
+  await expect(page.getByRole('link', { name: 'Full list on MAL', exact: true })).toHaveAttribute(
+    'href',
+    'https://myanimelist.net/animelist/animefan',
+  );
+  await expect(page.locator('.my-list-item').first()).toContainText('6 / 28 episodes');
+  await expect(page.locator('.my-list-item').last()).toContainText('1122 / ? episodes');
+  await page.screenshot({ path: 'artifacts/screenshots/my-list-options.png', fullPage: true });
+  await page.goto('/sidebar.html?demo=watching&view=list');
+  for (const width of [320, 360, 480]) {
+    await page.setViewportSize({ width, height: 850 });
+    await expect(page.locator('.my-list-item')).toHaveCount(3);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+  await page.setViewportSize({ width: 320, height: 850 });
+  await page.screenshot({ path: 'artifacts/screenshots/my-list-sidebar.png', fullPage: true });
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByLabel('Completion threshold')).toBeVisible();
 });

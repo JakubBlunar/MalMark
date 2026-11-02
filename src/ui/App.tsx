@@ -10,6 +10,7 @@ import { MatchesView } from './views/MatchesView';
 import { SitesView } from './views/SitesView';
 import { SettingsView } from './views/SettingsView';
 import { ProfileView } from './views/ProfileView';
+import { MyListView } from './views/MyListView';
 
 export function App() {
   const {
@@ -75,6 +76,7 @@ export function App() {
               {activeView === 'matches' && (
                 <MatchesView state={state} tabId={tabId} busy={busy} act={act} />
               )}
+              {activeView === 'list' && <MyListView state={state} />}
               {activeView === 'sites' && (
                 <SitesView state={state} tabId={tabId} busy={busy} act={act} />
               )}

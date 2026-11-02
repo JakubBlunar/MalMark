@@ -69,6 +69,7 @@ function start(): { stop: () => void } | undefined {
   let promptFrame: HTMLIFrameElement | undefined;
   let promptNonce = '';
   let promptHeight = 220;
+  let promptRevision = 0;
   let noticeTimer: number | undefined;
   const hiddenPrompts = new Set<string>();
 
@@ -91,6 +92,7 @@ function start(): { stop: () => void } | undefined {
     resizePrompt();
   }
   async function prompt(): Promise<void> {
+    const revision = ++promptRevision;
     if (!topPage && !document.fullscreenElement) {
       host?.remove();
       host = undefined;
@@ -104,6 +106,8 @@ function start(): { stop: () => void } | undefined {
       notice?: ProgressNotice;
       guidance?: GuidancePrompt;
     }>({ type: 'PROMPT_STATE' });
+    // A delayed response must not resurrect a dismissed prompt or replace a newer one.
+    if (!valid || revision !== promptRevision) return;
     const item = state?.pending.at(-1);
     const notice = state?.notice && state.notice.expiresAt > Date.now() ? state.notice : undefined;
     const id = notice
@@ -276,6 +280,7 @@ function start(): { stop: () => void } | undefined {
   };
   let players = createPlayerTracker(reportPlayback);
   function resetRoute() {
+    promptRevision++;
     lastUrl = location.href;
     routeChangedAt = Date.now();
     lastDetection = '';
@@ -356,6 +361,7 @@ function start(): { stop: () => void } | undefined {
       typeof message.nonce === 'string'
     ) {
       const nonce = message.nonce;
+      promptRevision++;
       host?.remove();
       host = undefined;
       startPicker(async (titleSelector, episodeSelector) => {

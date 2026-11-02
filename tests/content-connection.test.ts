@@ -34,6 +34,46 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 describe('recoverable content connection', () => {
+  it('ignores a stale prompt response after a newer response dismisses the prompt', async () => {
+    await import('../src/content/index');
+    await vi.advanceTimersByTimeAsync(6000);
+    let finishOld!: (value: unknown) => void;
+    let first = true;
+    mock.send.mockImplementation(async (message) => {
+      if (message.type === 'PROMPT_STATE' && first) {
+        first = false;
+        return new Promise((resolve) => {
+          finishOld = resolve;
+        });
+      }
+      return {
+        ok: true,
+        data: message.type === 'PROMPT_STATE' ? { pending: [], showPrompts: true } : undefined,
+      };
+    });
+    const receive = mock.add.mock.calls.at(-1)![0];
+    await receive({ type: 'PROMPT_CHANGED' });
+    await vi.advanceTimersByTimeAsync(0);
+    await receive({ type: 'PROMPT_CHANGED' });
+    await vi.advanceTimersByTimeAsync(0);
+    finishOld({
+      ok: true,
+      data: {
+        pending: [],
+        showPrompts: true,
+        nonce: 'old',
+        guidance: {
+          id: 'old-player',
+          kind: 'player',
+          title: 'A Show',
+          tabId: 1,
+          origins: ['https://player.example'],
+        },
+      },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(document.querySelector('[data-malmark-prompt]')).toBeNull();
+  });
   it('does not let an older config response overwrite selectors edited while loading', async () => {
     let finishOld!: (value: unknown) => void;
     let loads = 0;

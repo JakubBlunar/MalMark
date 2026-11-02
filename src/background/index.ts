@@ -11,7 +11,15 @@ import type {
 import { findMapping, positiveInteger, prefixMatches, siteForUrl } from '../shared/sites';
 import { searchForMatch } from './match-search';
 import { accumulate, emptyProgress, isComplete } from '../shared/progress';
-import { cancelLogin, connect, getAnime, searchAnime, updateAnime } from './mal';
+import {
+  cancelLogin,
+  connect,
+  getAnime,
+  getWatchingList,
+  refreshProfile,
+  searchAnime,
+  updateAnime,
+} from './mal';
 import { progressUpdateValues } from '../shared/list-status';
 import { localDate } from '../shared/completion';
 import {
@@ -890,6 +898,9 @@ browser.runtime.onMessage.addListener((raw: unknown, sender: browser.Runtime.Mes
     );
   const handle = async (): Promise<unknown> => {
     if (trustedUi) {
+      // Fetch outside the state queue so profile/list loading does not delay playback or logout.
+      if (message.type === 'REFRESH_PROFILE') return refreshProfile();
+      if (message.type === 'GET_WATCHING_LIST') return getWatchingList(message.offset);
       if (message.type === 'CONNECT') {
         await connect();
         await serialized(async () => {

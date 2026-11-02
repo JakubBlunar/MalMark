@@ -1,4 +1,32 @@
-import type { PublicState } from '../../shared/types';
+import type { PublicState, WatchingListPage } from '../../shared/types';
+
+export function previewWatchingList(accountId: number): WatchingListPage {
+  return {
+    accountId,
+    items: [
+      {
+        id: 52991,
+        title: 'Sousou no Frieren',
+        alternative_titles: { en: 'Frieren: Beyond Journey’s End' },
+        num_episodes: 28,
+        my_list_status: { status: 'watching', num_episodes_watched: 6 },
+      },
+      {
+        id: 31240,
+        title: 'Re:Zero kara Hajimeru Isekai Seikatsu',
+        alternative_titles: { en: 'Re:ZERO -Starting Life in Another World-' },
+        num_episodes: 25,
+        my_list_status: { status: 'watching', num_episodes_watched: 17, is_rewatching: true },
+      },
+      {
+        id: 21,
+        title: 'One Piece',
+        num_episodes: 0,
+        my_list_status: { status: 'watching', num_episodes_watched: 1122 },
+      },
+    ],
+  };
+}
 
 export function previewState(): PublicState {
   const demo = new URLSearchParams(location.search).get('demo');

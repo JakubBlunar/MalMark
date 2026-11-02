@@ -1,6 +1,7 @@
 import type Browser from 'webextension-polyfill';
 import type { Message, Reply } from '../../shared/types';
 import { chromiumSidePanel } from '../../shared/sidebar';
+import type { View } from '../types';
 
 export const inExtension = !!(globalThis as { chrome?: { runtime?: { id?: string } } }).chrome
   ?.runtime?.id;
@@ -88,8 +89,10 @@ export async function setupWebsite(url: string, tabId: number): Promise<void> {
   if (location.pathname.endsWith('popup.html')) window.close();
 }
 
-export async function openSettings(): Promise<void> {
-  await browser.runtime.openOptionsPage();
+export async function openFullView(view: View, tabId?: number): Promise<void> {
+  const params = new URLSearchParams({ view });
+  if (tabId !== undefined) params.set('tab', String(tabId));
+  await browser.tabs.create({ url: browser.runtime.getURL(`options.html?${params}`) });
 }
 
 export function openSidebar(tabId?: number): Promise<void> {
