@@ -13,6 +13,7 @@ import { siteForUrl } from '../shared/sites';
 import { startPicker } from './picker';
 import { inspectSiteSelectors } from '../shared/selector-validation';
 import { createPlayerTracker } from './player';
+import { i18n, initializeI18n, t } from '../shared/i18n';
 
 declare global {
   interface Window {
@@ -106,6 +107,8 @@ function start(): { stop: () => void } | undefined {
       notice?: ProgressNotice;
       guidance?: GuidancePrompt;
     }>({ type: 'PROMPT_STATE' });
+    if (state && (state.pending.length || state.guidance || state.newAnime || state.notice))
+      await initializeI18n(true, true);
     // A delayed response must not resurrect a dismissed prompt or replace a newer one.
     if (!valid || revision !== promptRevision) return;
     const item = state?.pending.at(-1);
@@ -131,6 +134,7 @@ function start(): { stop: () => void } | undefined {
     window.clearTimeout(noticeTimer);
     host?.remove();
     host = document.createElement('div');
+    host.lang = i18n.resolvedLanguage || 'en';
     host.setAttribute('data-malmark-prompt', '');
     host.dataset.prompt = id;
     host.style.cssText = 'all:initial;position:fixed;right:24px;bottom:24px;z-index:2147483647;';
@@ -139,16 +143,22 @@ function start(): { stop: () => void } | undefined {
       host.setAttribute('data-malmark-notice', '');
       host.setAttribute('role', 'status');
       host.setAttribute('aria-live', 'polite');
-      host.setAttribute('aria-label', `MyAnimeList updated. Episode ${notice.episode} saved.`);
+      host.setAttribute(
+        'aria-label',
+        t('MyAnimeList updated. Episode {{episode}} saved.', { episode: notice.episode }),
+      );
       const style = document.createElement('style');
       style.textContent =
         '.notice{box-sizing:border-box;font:14px/1.5 system-ui,sans-serif;background:#181b24;color:#f3f3fa;border:1px solid #477563;border-radius:16px;padding:18px;width:min(360px,calc(100vw - 48px));box-shadow:0 12px 40px #0007}strong{display:block;color:#75dfb5;font-size:16px;margin-bottom:6px}p{margin:0;color:#c9ccda;overflow-wrap:anywhere}';
       const card = document.createElement('div');
       card.className = 'notice';
       const title = document.createElement('strong');
-      title.textContent = 'Progress updated';
+      title.textContent = t('Progress updated');
       const text = document.createElement('p');
-      text.textContent = `${notice.title} · Episode ${notice.episode} saved on MyAnimeList.`;
+      text.textContent = t('{{title}} · Episode {{episode}} saved on MyAnimeList.', {
+        title: notice.title,
+        episode: notice.episode,
+      });
       card.append(title, text);
       shadow.append(style, card);
       placePrompt();
@@ -169,10 +179,10 @@ function start(): { stop: () => void } | undefined {
       frame.src = browser.runtime.getURL(`prompt.html#${state.nonce}`);
       frame.title =
         state.guidance?.kind === 'player'
-          ? 'Malmark player access'
+          ? t('Malmark player access')
           : state.guidance
-            ? 'Malmark anime match'
-            : 'Malmark episode update';
+            ? t('Malmark anime match')
+            : t('Malmark episode update');
       frame.referrerPolicy = 'no-referrer';
       frame.style.cssText =
         'border:0;display:block;width:min(360px,calc(100vw - 48px));height:220px;max-height:calc(100dvh - 48px);border-radius:16px;box-shadow:0 12px 40px #0007;';
@@ -194,19 +204,23 @@ function start(): { stop: () => void } | undefined {
     tag.textContent = 'MALMARK';
     const title = document.createElement('strong');
     title.textContent = item
-      ? `Episode ${item.episode} is ready to log`
-      : 'A new anime for your list?';
+      ? t('Episode {{episode}} is ready to log', { episode: item.episode })
+      : t('A new anime for your list?');
     const description = document.createElement('p');
     description.textContent = item
-      ? `${item.anime.title} · Update MAL from ${item.previous} to ${item.episode} episodes?`
-      : `Add ${state.newAnime!.title} to Currently Watching on MyAnimeList?`;
+      ? t('{{title}} · Update MAL from {{previous}} to {{episode}} episodes?', {
+          title: item.anime.title,
+          previous: item.previous,
+          episode: item.episode,
+        })
+      : t('Add {{title}} to Currently Watching on MyAnimeList?', { title: state.newAnime!.title });
     const review = document.createElement('button');
-    review.textContent = item ? 'Review update' : 'Review anime';
+    review.textContent = item ? t('Review update') : t('Review anime');
     review.addEventListener('click', () => {
       void send({ type: 'OPEN_EXTENSION' });
     });
     const later = document.createElement('button');
-    later.textContent = 'Later';
+    later.textContent = t('Later');
     later.addEventListener('click', () => {
       hiddenPrompts.add(id);
       host?.remove();
@@ -385,6 +399,13 @@ function start(): { stop: () => void } | undefined {
   };
   browser.runtime.onMessage.addListener(listener);
   const events = new AbortController();
+  const refreshLanguage = () => {
+    if (!host) return;
+    host.remove();
+    host = undefined;
+    void prompt();
+  };
+  i18n.on('languageChanged', refreshLanguage);
   window.addEventListener('resize', resizePrompt, { signal: events.signal });
   window.visualViewport?.addEventListener('resize', resizePrompt, { signal: events.signal });
   document.addEventListener('fullscreenchange', () => void prompt(), { signal: events.signal });
@@ -427,6 +448,7 @@ function start(): { stop: () => void } | undefined {
     window.clearTimeout(noticeTimer);
     players.stop();
     events.abort();
+    i18n.off('languageChanged', refreshLanguage);
     host?.remove();
     if (window.__malmarkController?.stop === stop) delete window.__malmarkController;
     try {

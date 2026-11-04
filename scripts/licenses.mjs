@@ -35,7 +35,7 @@ export async function thirdPartyNotices(inputs) {
   );
   for (const { root, pkg } of packages.sort((a, b) => a.pkg.name.localeCompare(b.pkg.name))) {
     const licenses = (await readdir(root)).filter((file) =>
-      /^(?:license|copying|notice)(?:\.|$)/i.test(file),
+      /^(?:licen[sc]e|copying|notice)(?:\.|$)/i.test(file),
     );
     if (!licenses.length) throw new Error(`Missing dependency license: ${pkg.name}`);
     sections.push(`## ${pkg.name} ${pkg.version}`, `License: ${pkg.license}.`);

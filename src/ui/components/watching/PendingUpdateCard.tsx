@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ArrowRight, Check, CircleCheck } from 'lucide-react';
 import type { PendingUpdate } from '../../../shared/types';
 import type { Act } from '../../types';
@@ -16,12 +17,13 @@ export function PendingUpdateCard({
   act: Act;
   autoFinishDate: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <section className="card pending-card">
       <div className="eyebrow mint">
-        <CircleCheck size={14} /> READY TO LOG
+        <CircleCheck size={14} /> {t('READY TO LOG')}
       </div>
-      <h2>Another episode, in the books.</h2>
+      <h2>{t('Another episode, in the books.')}</h2>
       <p>{item.anime.alternative_titles?.en || item.anime.title}</p>
       {progressListNote(item.anime) && <p className="helper">{progressListNote(item.anime)}</p>}
       {item.error && (
@@ -32,18 +34,20 @@ export function PendingUpdateCard({
       <div className="progress-change">
         <span>
           {item.previous}
-          <small>ON MYANIMELIST</small>
+          <small>{t('ON MYANIMELIST')}</small>
         </span>
         <ArrowRight size={24} />
         <span className="new-count">
           {item.episode}
-          <small>EPISODES WATCHED</small>
+          <small>{t('EPISODES WATCHED')}</small>
         </span>
       </div>
       {item.episode > item.previous + 1 && (
         <p className="helper warning-text">
-          This also marks episodes {item.previous + 1}–{item.episode - 1} as watched. MAL stores a
-          total episode count.
+          {t(
+            'This also marks episodes {{first}}–{{last}} as watched. MAL stores a total episode count.',
+            { first: item.previous + 1, last: item.episode - 1 },
+          )}
         </p>
       )}
       <div className="button-row">
@@ -54,20 +58,20 @@ export function PendingUpdateCard({
             void act(
               item.id,
               { type: 'APPROVE_UPDATE', id: item.id },
-              'Progress updated on MyAnimeList.',
+              t('Progress updated on MyAnimeList.'),
             )
           }
         >
-          {busy === item.id ? <Spinner /> : <Check size={16} />} Update progress
+          {busy === item.id ? <Spinner /> : <Check size={16} />} {t('Update progress')}
         </button>
         <button
           disabled={!!busy}
           className="button secondary"
           onClick={() =>
-            void act('skip', { type: 'DISMISS_UPDATE', id: item.id }, 'Update skipped.')
+            void act('skip', { type: 'DISMISS_UPDATE', id: item.id }, t('Update skipped.'))
           }
         >
-          Skip
+          {t('Skip')}
         </button>
       </div>
       <CompleteAnimeControl

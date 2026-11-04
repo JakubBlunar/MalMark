@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Eye, Plus } from 'lucide-react';
 import type { WatchSession } from '../../../shared/types';
 import type { Act } from '../../types';
@@ -16,13 +17,14 @@ export function PlayerAccessCard({
   busy: string;
   act: Act;
 }) {
+  const { t } = useTranslation();
   return (
     <section className="card player-access">
       <div className="row-icon">
         <Eye size={18} />
         <div>
-          <h3>Connect the embedded player</h3>
-          <p>Allow its domain to read playback time. Choose the host used by the video.</p>
+          <h3>{t('Connect the embedded player')}</h3>
+          <p>{t('Allow its domain to read playback time. Choose the host used by the video.')}</p>
         </div>
       </div>
       {s.frameOrigins
@@ -37,11 +39,11 @@ export function PlayerAccessCard({
                 void act(
                   origin,
                   () => grantPlayer(origin, tabId!),
-                  'Player access granted. Start or resume the video.',
+                  t('Player access granted. Start or resume the video.'),
                 )
               }
             >
-              Allow <Plus size={13} />
+              {t('Allow')} <Plus size={13} />
             </button>
           </div>
         ))}

@@ -1,3 +1,4 @@
+import { t } from '../../shared/i18n';
 import type Browser from 'webextension-polyfill';
 import type { Message, Reply } from '../../shared/types';
 import { chromiumSidePanel } from '../../shared/sidebar';
@@ -22,13 +23,17 @@ export async function request<T = void>(message: Message): Promise<T> {
       )
     ) {
       throw new Error(
-        'Malmark could not reach its background script. Reload the extension on your browser’s extensions page, then reopen Malmark.',
+        t(
+          'Malmark could not reach its background script. Reload the extension on your browser’s extensions page, then reopen Malmark.',
+        ),
       );
     }
     throw error;
   }
   if (!response?.ok)
-    throw new Error(response?.error || 'The extension did not respond. Reload it and try again.');
+    throw new Error(
+      response?.error || t('The extension did not respond. Reload it and try again.'),
+    );
   return response.data;
 }
 
@@ -55,14 +60,14 @@ export async function grantPlayer(origin: string, tabId: number): Promise<void> 
   // The permission request stays directly in the user's click handler.
   const granted = await browser.permissions.request({ origins: [origin + '/*'] });
   if (!granted)
-    throw new Error('Player access was not granted. You can try again whenever you want.');
+    throw new Error(t('Player access was not granted. You can try again whenever you want.'));
   await request({ type: 'INJECT_PLAYERS', tabId });
 }
 
 export async function grantPromptPlayer(origin: string, nonce: string): Promise<void> {
   const granted = await browser.permissions.request({ origins: [origin + '/*'] });
   if (!granted)
-    throw new Error('Player access was not granted. You can try again or choose Later.');
+    throw new Error(t('Player access was not granted. You can try again or choose Later.'));
   await request({ type: 'GUIDANCE_ACTION', nonce, action: 'player', origin });
 }
 
@@ -81,7 +86,7 @@ export async function setupWebsite(url: string, tabId: number): Promise<void> {
       prepared,
       browser.permissions.request({ origins: [origin + '/*'] }),
     ]);
-    if (!granted) throw new Error('Website access was not granted. No selectors were saved.');
+    if (!granted) throw new Error(t('Website access was not granted. No selectors were saved.'));
   } catch (error) {
     await request({ type: 'CANCEL_SETUP', tabId, requestId }).catch(() => undefined);
     throw error;
@@ -102,7 +107,9 @@ export function openSidebar(tabId?: number): Promise<void> {
   if (panel?.open && tabId !== undefined) return panel.open({ tabId });
   return Promise.reject(
     new Error(
-      'The sidebar is unavailable. Open Malmark from the browser’s sidebar menu, or use the popup.',
+      t(
+        'The sidebar is unavailable. Open Malmark from the browser’s sidebar menu, or use the popup.',
+      ),
     ),
   );
 }

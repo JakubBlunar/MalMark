@@ -51,7 +51,7 @@ describe('recoverable content connection', () => {
         data: message.type === 'PROMPT_STATE' ? { pending: [], showPrompts: true } : undefined,
       };
     });
-    const receive = mock.add.mock.calls.at(-1)![0];
+    const receive = mock.add.mock.calls[0][0];
     await receive({ type: 'PROMPT_CHANGED' });
     await vi.advanceTimersByTimeAsync(0);
     await receive({ type: 'PROMPT_CHANGED' });
@@ -96,7 +96,7 @@ describe('recoverable content connection', () => {
       return { ok: true };
     });
     await import('../src/content/index');
-    await mock.add.mock.calls.at(-1)![0]({ type: 'SITE_CONFIG_CHANGED' });
+    await mock.add.mock.calls[0][0]({ type: 'SITE_CONFIG_CHANGED' });
     finishOld({ ok: true, data: { ...base, titleSelector: 'a', episodeSelector: 'h1' } });
     await vi.advanceTimersByTimeAsync(6000);
     expect(loads).toBe(2);
@@ -118,7 +118,7 @@ describe('recoverable content connection', () => {
       data:
         message.type === 'PROMPT_STATE' ? { pending: [], showPrompts: false, notice } : undefined,
     }));
-    await mock.add.mock.calls.at(-1)![0]({ type: 'PROMPT_CHANGED' });
+    await mock.add.mock.calls[0][0]({ type: 'PROMPT_CHANGED' });
     await vi.advanceTimersByTimeAsync(0);
     expect(document.querySelector('[data-malmark-notice]')?.getAttribute('aria-label')).toContain(
       'Episode 2 saved',
@@ -141,7 +141,7 @@ describe('recoverable content connection', () => {
     await import('../src/content/index');
     await vi.advanceTimersByTimeAsync(6000);
     const frame = (attach.mock.results.at(-1)!.value as ShadowRoot).querySelector('iframe')!;
-    const receive = mock.add.mock.calls.at(-1)![0];
+    const receive = mock.add.mock.calls[0][0];
     const size = { type: 'INLINE_PROMPT_SIZE', nonce: 'size-grant', height: 300 };
     expect(frame.style.height).toBe('220px');
     await receive(size, { id: 'other' });
@@ -178,7 +178,7 @@ describe('recoverable content connection', () => {
     document.querySelector('h1')!.textContent = 'Episode 3';
     const video = document.querySelector('video')!;
     Object.defineProperty(video, 'currentTime', { value: 0, configurable: true });
-    await mock.add.mock.calls.at(-1)![0]({ type: 'ROUTE_CHANGED', pageUrl: location.href });
+    await mock.add.mock.calls[0][0]({ type: 'ROUTE_CHANGED', pageUrl: location.href });
     await vi.advanceTimersByTimeAsync(6000);
     expect(
       mock.send.mock.calls.some(([m]) => m.type === 'DETECTION' && m.detection?.episode === 3),
@@ -207,7 +207,7 @@ describe('recoverable content connection', () => {
     await import('../src/content/index');
     await vi.advanceTimersByTimeAsync(6000);
     mock.send.mockClear();
-    await mock.add.mock.calls.at(-1)![0]({ type: 'PING_PLAYER' });
+    await mock.add.mock.calls[0][0]({ type: 'PING_PLAYER' });
     expect(mock.send.mock.calls.some(([message]) => message.type === 'PLAYBACK')).toBe(true);
   });
   it('retries initialization after a missing background receiver and reconnects playback', async () => {
@@ -244,7 +244,7 @@ describe('recoverable content connection', () => {
       mock.send.mock.calls.filter(([message]) => message.type === 'PLAYBACK').length,
     ).toBeGreaterThanOrEqual(2);
     expect(window.__malmarkController).toBeDefined();
-    const listener = mock.add.mock.calls.at(-1)![0];
+    const listener = mock.add.mock.calls[0][0];
     expect(await listener({ type: 'PING_PLAYER' })).toEqual({ ready: true });
   });
   it.each(['async', 'sync'])(

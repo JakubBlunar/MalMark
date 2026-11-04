@@ -159,6 +159,7 @@ export interface PublicState {
 
 export type Message =
   | SetupMessage
+  | { type: 'GET_LANGUAGE_PREFERENCE' }
   | { type: 'DETECTION'; detection: Detection | null; pageUrl: string; frameOrigins: string[] }
   | { type: 'PLAYBACK'; playback: Playback; pageUrl: string }
   | { type: 'GET_STATE'; tabId?: number }

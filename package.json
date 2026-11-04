@@ -24,16 +24,19 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "format": "prettier --write src tests scripts store .github *.json *.ts *.html *.md",
-    "format:check": "prettier --check src tests scripts store .github *.json *.ts *.html *.md",
+    "format": "prettier --write src public tests scripts store .github *.json *.ts *.html *.md",
+    "format:check": "prettier --check src public tests scripts store .github *.json *.ts *.html *.md",
     "package": "npm run build && node scripts/package.mjs",
     "package:store": "npm run build:store && node scripts/package.mjs",
     "lint:firefox": "web-ext lint --source-dir dist/firefox --no-config-discovery"
   },
   "dependencies": {
+    "i18next": "26.7.1",
+    "i18next-http-backend": "4.0.10",
     "lucide-react": "1.63.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "react-i18next": "17.1.12",
     "webextension-polyfill": "0.12.0"
   },
   "devDependencies": {

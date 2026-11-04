@@ -68,6 +68,7 @@ describe('release packaging', () => {
       'node_modules/scheduler/index.js',
       'node_modules/lucide-react/dist/cjs/lucide-react.js',
       'node_modules/webextension-polyfill/dist/browser-polyfill.js',
+      'node_modules/i18next-http-backend/esm/index.js',
     ]);
     for (const pkg of [
       'react',
@@ -75,6 +76,7 @@ describe('release packaging', () => {
       'scheduler',
       'lucide-react',
       'webextension-polyfill',
+      'i18next-http-backend',
       'vite',
       'rolldown',
       'esbuild',

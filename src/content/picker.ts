@@ -1,6 +1,7 @@
 import { selectedEpisode } from './detect';
 import { selectorFor } from './selectors';
 import { inspectSiteSelectors, selectorPreviewText } from '../shared/selector-validation';
+import { i18n, initializeI18n, t } from '../shared/i18n';
 
 let stopCurrent: (() => void) | undefined;
 
@@ -20,7 +21,7 @@ export function startPicker(
     '.panel{box-sizing:border-box;width:min(390px,calc(100vw - 48px));max-height:calc(100dvh - 48px);overflow:auto}label{display:block;font-weight:600;margin-top:12px}textarea{box-sizing:border-box;width:100%;resize:vertical;min-height:58px;font:12px/1.5 ui-monospace,monospace;color:#e9e4fa;background:#10131b;border:1px solid #59516d;border-radius:6px;padding:8px;margin:6px 0;overflow-wrap:anywhere}textarea:focus-visible{outline:2px solid #b6a5fc;outline-offset:2px}.result{font-size:12px;overflow-wrap:anywhere;margin:0 0 10px}';
   panel.className = 'panel';
   panel.setAttribute('role', 'dialog');
-  panel.setAttribute('aria-label', 'Set up website');
+  panel.setAttribute('aria-label', t('Set up website'));
   const tag = document.createElement('div');
   tag.className = 'tag';
   const heading = document.createElement('h2');
@@ -30,20 +31,20 @@ export function startPicker(
   error.className = 'error';
   error.setAttribute('role', 'status');
   const saveButton = document.createElement('button');
-  saveButton.textContent = 'Save website';
+  saveButton.textContent = t('Save website');
   saveButton.hidden = true;
   const reset = document.createElement('button');
   reset.className = 'secondary';
-  reset.textContent = 'Start over';
+  reset.textContent = t('Start over');
   const manual = document.createElement('button');
   manual.className = 'secondary';
-  manual.textContent = 'Enter selectors manually';
+  manual.textContent = t('Enter selectors manually');
   const cancel = document.createElement('button');
   cancel.className = 'secondary';
-  cancel.textContent = 'Cancel';
+  cancel.textContent = t('Cancel');
   const move = document.createElement('button');
   move.className = 'secondary';
-  move.textContent = 'Move panel';
+  move.textContent = t('Move panel');
   move.addEventListener('click', () => {
     const left = host.style.left === '24px';
     Object.assign(
@@ -80,8 +81,8 @@ export function startPicker(
     preview.append(container);
     return { container, input, result };
   }
-  const titleField = field('Anime title selector', 'malmark-title-selector');
-  const episodeField = field('Episode selector', 'malmark-episode-selector');
+  const titleField = field(t('Anime title selector'), 'malmark-title-selector');
+  const episodeField = field(t('Episode selector'), 'malmark-episode-selector');
 
   function refreshPreview(): boolean {
     const result = inspectSiteSelectors(titleSelector, episodeSelector);
@@ -102,19 +103,42 @@ export function startPicker(
     });
 
   function render(): void {
-    tag.textContent = `MALMARK · ${step < 2 ? `STEP ${step + 1} OF 2` : 'REVIEW'} · ${location.hostname}`;
+    host.lang = i18n.resolvedLanguage || 'en';
+    panel.setAttribute('aria-label', t('Set up website'));
+    saveButton.textContent = t('Save website');
+    reset.textContent = t('Start over');
+    manual.textContent = t('Enter selectors manually');
+    cancel.textContent = t(step === 3 ? 'Done' : 'Cancel');
+    move.textContent = t('Move panel');
+    titleField.container.querySelector('label')!.textContent = t('Anime title selector');
+    episodeField.container.querySelector('label')!.textContent = t('Episode selector');
+    if (step === 3) {
+      tag.textContent = t('MALMARK · WEBSITE SAVED');
+      heading.textContent = t('You’re all set.');
+      description.textContent = t(
+        'Open Malmark to review the match. These elements will be checked as you change episodes.',
+      );
+      return;
+    }
+    tag.textContent = `MALMARK · ${step < 2 ? t('STEP {{step}} OF 2', { step: step + 1 }) : t('REVIEW')} · ${location.hostname}`;
     heading.textContent =
       step === 0
-        ? 'Pick the anime title.'
+        ? t('Pick the anime title.')
         : step === 1
-          ? 'Pick the episode number.'
-          : 'Does this look right?';
+          ? t('Pick the episode number.')
+          : t('Does this look right?');
     description.textContent =
       step === 0
-        ? 'Click the element that shows the anime’s name. Choose a title that stays the same across episodes.'
+        ? t(
+            'Click the element that shows the anime’s name. Choose a title that stays the same across episodes.',
+          )
         : step === 1
-          ? 'Click the current episode number, such as “Episode 7” or “7”. Press Escape to cancel.'
-          : 'Fine-tune these CSS selectors if needed. The first matching element supplies its text on this domain.';
+          ? t(
+              'Click the current episode number, such as “Episode 7” or “7”. Press Escape to cancel.',
+            )
+          : t(
+              'Fine-tune these CSS selectors if needed. The first matching element supplies its text on this domain.',
+            );
     saveButton.hidden = step !== 2;
     manual.hidden = step >= 2;
     preview.hidden = step === 0 || step === 3;
@@ -162,12 +186,13 @@ export function startPicker(
     event.stopImmediatePropagation();
     const value = event.target.textContent?.trim() || '';
     if (!value || value.length > 300) {
-      error.textContent = 'Choose a smaller element containing just the title or episode.';
+      error.textContent = t('Choose a smaller element containing just the title or episode.');
       return;
     }
     if (step === 1 && selectedEpisode(value) === null) {
-      error.textContent =
-        'No whole episode number found. Choose an element like “Episode 7” or “7”.';
+      error.textContent = t(
+        'No whole episode number found. Choose an element like “Episode 7” or “7”.',
+      );
       return;
     }
     error.textContent = '';
@@ -189,6 +214,7 @@ export function startPicker(
   }
 
   function stop(): void {
+    i18n.off('languageChanged', render);
     host.remove();
     highlight.remove();
     document.removeEventListener('mouseover', hover, true);
@@ -209,14 +235,11 @@ export function startPicker(
     void save(titleSelector.trim(), episodeSelector.trim())
       .then(() => {
         step = 3;
-        tag.textContent = 'MALMARK · WEBSITE SAVED';
-        heading.textContent = 'You’re all set.';
-        description.textContent =
-          'Open Malmark to review the match. These elements will be checked as you change episodes.';
+        render();
         saveButton.hidden = true;
         reset.hidden = true;
         preview.hidden = true;
-        cancel.textContent = 'Done';
+        cancel.textContent = t('Done');
       })
       .catch((e) => {
         error.textContent = e.message;
@@ -247,4 +270,8 @@ export function startPicker(
   document.addEventListener('keydown', key, true);
   stopCurrent = stop;
   render();
+  i18n.on('languageChanged', render);
+  void initializeI18n(true, true).then(() => {
+    if (host.isConnected) render();
+  });
 }

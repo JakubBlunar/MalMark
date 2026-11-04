@@ -6,6 +6,7 @@ export async function reviewerSource(configuration) {
   const files = {};
   const roots = [
     'src',
+    'public',
     'scripts',
     'tests',
     'store',
@@ -23,6 +24,7 @@ export async function reviewerSource(configuration) {
     'options.html',
     'prompt.html',
     'README.md',
+    'LOCALIZATION.md',
     'CHANGELOG.md',
     'PRIVACY.md',
     'LICENSE',
@@ -38,7 +40,7 @@ export async function reviewerSource(configuration) {
     }
   }
   for (const root of roots) {
-    if (['src', 'scripts', 'tests', 'store'].includes(root)) await walk(root);
+    if (['src', 'public', 'scripts', 'tests', 'store'].includes(root)) await walk(root);
     else files[root] = new Uint8Array(await readFile(root));
   }
   files['reviewer-config.json'] = new TextEncoder().encode(

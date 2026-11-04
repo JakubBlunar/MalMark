@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ChevronRight, ShieldCheck } from 'lucide-react';
 import type { Navigate, ViewProps } from '../types';
 import { SignInCard } from '../components/watching/SignInCard';
@@ -15,18 +16,19 @@ export function WatchingView({
   go,
   signIn,
 }: ViewProps & { go: Navigate; signIn: () => Promise<void> }) {
+  const { t } = useTranslation();
   const s = state.session;
   return (
     <>
       <div className="section-heading">
-        <span className="eyebrow">YOUR WATCH COMPANION</span>
+        <span className="eyebrow">{t('YOUR WATCH COMPANION')}</span>
         <span className="quiet-tag">
           <i className={s?.playerConnected ? 'pulse' : ''} />
           {s?.playerConnected
-            ? 'Player connected'
+            ? t('Player connected')
             : s
-              ? 'Waiting for player'
-              : 'Ready when you are'}
+              ? t('Waiting for player')
+              : t('Ready when you are')}
         </span>
       </div>
       {!state.connected ? (
@@ -81,8 +83,10 @@ export function WatchingView({
                 <ShieldCheck size={14} />
                 <span>
                   {state.settings.autoProgress
-                    ? 'Automatic progress is on for next episodes. Other changes need your confirmation.'
-                    : 'We’ll ask before updating your list. Automatic progress is off.'}
+                    ? t(
+                        'Automatic progress is on for next episodes. Other changes need your confirmation.',
+                      )
+                    : t('We’ll ask before updating your list. Automatic progress is off.')}
                 </span>
               </div>
             </>
@@ -94,17 +98,17 @@ export function WatchingView({
       <div className="how-it-works">
         <div>
           <span>01</span>
-          <p>Play an episode</p>
+          <p>{t('Play an episode')}</p>
         </div>
         <ChevronRight size={13} />
         <div>
           <span>02</span>
-          <p>Find your match</p>
+          <p>{t('Find your match')}</p>
         </div>
         <ChevronRight size={13} />
         <div>
           <span>03</span>
-          <p>{state.settings.autoProgress ? 'Track & log' : 'Confirm & log'}</p>
+          <p>{state.settings.autoProgress ? t('Track & log') : t('Confirm & log')}</p>
         </div>
       </div>
     </>

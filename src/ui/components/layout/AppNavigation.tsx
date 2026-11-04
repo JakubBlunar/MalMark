@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Globe2, Link2, ListVideo, ShieldCheck, TvMinimal, UserRound } from 'lucide-react';
 import type { View, Navigate } from '../../types';
 import { fullPage } from '../../lib/surface';
@@ -11,24 +12,25 @@ export function AppNavigation({
   go: Navigate;
   pendingCount: number;
 }) {
+  const { t } = useTranslation();
   return (
-    <nav className="navigation" aria-label="Main navigation">
+    <nav className="navigation" aria-label={t('Main navigation')}>
       <button className={view === 'watching' ? 'active' : ''} onClick={() => go('watching')}>
         <TvMinimal size={16} />
-        <span>Watching</span>
+        <span>{t('Watching')}</span>
         {!!pendingCount && <i className="nav-count">{pendingCount}</i>}
       </button>
       <button className={view === 'matches' ? 'active' : ''} onClick={() => go('matches')}>
         <Link2 size={16} />
-        <span>Matches</span>
+        <span>{t('Matches')}</span>
       </button>
       <button className={view === 'sites' ? 'active' : ''} onClick={() => go('sites')}>
         <Globe2 size={16} />
-        <span>Sites</span>
+        <span>{t('Sites')}</span>
       </button>
       <button className={view === 'list' ? 'active' : ''} onClick={() => go('list')}>
         <ListVideo size={16} />
-        <span>My list</span>
+        <span>{t('My list')}</span>
       </button>
       {fullPage && (
         <button
@@ -36,21 +38,21 @@ export function AppNavigation({
           onClick={() => go('profile')}
         >
           <UserRound size={16} />
-          <span>Profile</span>
+          <span>{t('Profile')}</span>
         </button>
       )}
       {fullPage && (
         <div className="sidebar-note">
           <ShieldCheck size={20} />
           <p>
-            Your list.
+            {t('Your list.')}
             <br />
-            Your call.
+            {t('Your call.')}
           </p>
           <small>
-            Confirm updates
+            {t('Confirm updates')}
             <br />
-            or enable automatic progress.
+            {t('or enable automatic progress.')}
           </small>
         </div>
       )}

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, ExternalLink, Link2 } from 'lucide-react';
 import type { Anime, Mapping, WatchSession } from '../../../shared/types';
@@ -25,6 +26,7 @@ export function MatchDetailsForm({
   onBack: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const [prefix, setPrefix] = useState(existing?.prefix || defaultPrefix(session.detection));
   const [offset, setOffset] = useState(String(existing?.episodeOffset || 0));
   const saveButton = useRef<HTMLButtonElement>(null);
@@ -44,22 +46,22 @@ export function MatchDetailsForm({
             prefix,
             episodeOffset: Number(offset),
           },
-          'Match saved on this device. Watch tracking restarted.',
+          t('Match saved on this device. Watch tracking restarted.'),
         ).then((ok) => {
           if (ok) onSaved();
         });
       }}
     >
       <button type="button" className="text-button match-back" onClick={onBack}>
-        <ArrowRight size={14} /> Back to results
+        <ArrowRight size={14} /> {t('Back to results')}
       </button>
       <div className="selected-summary">
         <AnimeCover anime={selected} />
         <span>
-          <small>SELECTED MATCH</small>
+          <small>{t('SELECTED MATCH')}</small>
           <b>{selected.alternative_titles?.en || selected.title}</b>
           <small>
-            {selected.start_season?.year || '—'} · {selected.num_episodes || '?'} episodes
+            {selected.start_season?.year || '—'} · {selected.num_episodes || '?'} {t('episodes')}
           </small>
         </span>
       </div>
@@ -69,14 +71,14 @@ export function MatchDetailsForm({
         target="_blank"
         rel="noreferrer"
       >
-        Verify the season on MAL <ExternalLink size={12} />
+        {t('Verify the season on MAL')} <ExternalLink size={12} />
       </a>
       <button ref={saveButton} disabled={!!busy} className="button primary wide">
-        {busy === 'mapping' ? <Spinner /> : <Link2 size={16} />} Save match
+        {busy === 'mapping' ? <Spinner /> : <Link2 size={16} />} {t('Save match')}
       </button>
       <details className="match-advanced">
-        <summary>URL rule &amp; episode offset</summary>
-        <label htmlFor="url-prefix">Remember for this URL prefix</label>
+        <summary>{t('URL rule & episode offset')}</summary>
+        <label htmlFor="url-prefix">{t('Remember for this URL prefix')}</label>
         <input
           id="url-prefix"
           required
@@ -86,10 +88,14 @@ export function MatchDetailsForm({
         />
         <p className="helper">
           {session.detection.site === 'crunchyroll'
-            ? 'Crunchyroll rules also match the detected series and season, since each episode has its own URL.'
-            : 'The detected series also scopes this rule. A domain-wide prefix works even when episode URLs change completely.'}
+            ? t(
+                'Crunchyroll rules also match the detected series and season, since each episode has its own URL.',
+              )
+            : t(
+                'The detected series also scopes this rule. A domain-wide prefix works even when episode URLs change completely.',
+              )}
         </p>
-        <label htmlFor="episode-offset">Episode offset</label>
+        <label htmlFor="episode-offset">{t('Episode offset')}</label>
         <input
           id="episode-offset"
           type="number"
@@ -101,7 +107,7 @@ export function MatchDetailsForm({
           onChange={(event) => setOffset(event.target.value)}
         />
         <p className="helper">
-          MAL episode = site episode + offset. Example: site 25 → MAL 1 uses −24.
+          {t('MAL episode = site episode + offset. Example: site 25 → MAL 1 uses −24.')}
         </p>
       </details>
     </form>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Radio } from 'lucide-react';
 import type { Settings, WatchProgress } from '../../../shared/types';
 import { clock } from '../../lib/display';
@@ -11,11 +12,12 @@ export function WatchProgressBar({
   connected: boolean;
   settings: Settings;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="watch-progress">
       <div className="progress-label">
         <span>
-          <Radio size={14} /> {connected ? 'Watch progress' : 'Waiting for the player'}
+          <Radio size={14} /> {connected ? t('Watch progress') : t('Waiting for the player')}
         </span>
         <b>
           {progress.duration
@@ -34,11 +36,11 @@ export function WatchProgressBar({
       </div>
       <div className="progress-caption">
         <span>
-          {clock(progress.watched)} watched{' '}
+          {clock(progress.watched)} {t('watched')}{' '}
           {progress.duration > 0 && `/ ${clock(progress.duration)}`}
         </span>
         <span>
-          {settings.threshold}%{settings.promptAtEnd ? ' or near end' : ' to prompt'}
+          {settings.threshold}%{settings.promptAtEnd ? t(' or near end') : t(' to prompt')}
         </span>
       </div>
     </div>

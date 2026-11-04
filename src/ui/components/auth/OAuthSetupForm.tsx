@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { ArrowRight, Copy, ExternalLink } from 'lucide-react';
 import type { Act } from '../../types';
@@ -18,8 +19,9 @@ export function OAuthSetupForm({
   onSaved: () => void;
   onCancel?: () => void;
 }) {
+  const { t } = useTranslation();
   const [clientId, setClientId] = useState(savedId);
-  const [copyLabel, setCopyLabel] = useState('Copy redirect URL');
+  const [copyLabel, setCopyLabel] = useState(t('Copy redirect URL'));
   return (
     <form
       className="oauth-setup"
@@ -31,14 +33,15 @@ export function OAuthSetupForm({
       <ol className="oauth-steps">
         <li>
           <a href="https://myanimelist.net/apiconfig" target="_blank" rel="noreferrer">
-            Create a MAL API app <ExternalLink size={12} />
+            {t('Create a MAL API app')} <ExternalLink size={12} />
           </a>
           <span>
-            Choose app type <b>Other</b>. This extension uses a public client ID.
+            {t('Choose app type')} <b>{t('Other')}</b>
+            {t('. This extension uses a public client ID.')}
           </span>
         </li>
         <li>
-          <label htmlFor="oauth-redirect">Register this exact redirect URL</label>
+          <label htmlFor="oauth-redirect">{t('Register this exact redirect URL')}</label>
           <div className="button-row">
             <input
               id="oauth-redirect"
@@ -55,9 +58,9 @@ export function OAuthSetupForm({
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(redirectUrl);
-                  setCopyLabel('Copied redirect URL');
+                  setCopyLabel(t('Copied redirect URL'));
                 } catch {
-                  setCopyLabel('Select the URL and copy it manually');
+                  setCopyLabel(t('Select the URL and copy it manually'));
                 }
               }}
             >
@@ -65,17 +68,18 @@ export function OAuthSetupForm({
             </button>
           </div>
           <span>
-            Use the URL from this installation. If you move its folder, check it again before
-            signing in.
+            {t(
+              'Use the URL from this installation. If you move its folder, check it again before signing in.',
+            )}
           </span>
         </li>
         <li>
-          <label htmlFor="oauth-client">MAL Client ID</label>
+          <label htmlFor="oauth-client">{'MAL Client ID'}</label>
           <input
             id="oauth-client"
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
-            placeholder="Paste your app’s client ID"
+            placeholder={t('Paste your app’s client ID')}
             autoComplete="off"
             spellCheck={false}
             required
@@ -89,11 +93,11 @@ export function OAuthSetupForm({
         aria-busy={busy === 'oauth-setup'}
       >
         {busy === 'oauth-setup' ? <Spinner /> : <ArrowRight size={17} />}
-        Save and continue
+        {t('Save and continue')}
       </button>
       {onCancel && (
         <button type="button" className="text-button" disabled={!!busy} onClick={onCancel}>
-          Cancel
+          {t('Cancel')}
         </button>
       )}
     </form>

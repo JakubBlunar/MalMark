@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Sparkles } from 'lucide-react';
 import { version } from '../../../shared/releases';
@@ -29,6 +30,7 @@ export function ReleaseNotesCard({
   openRequest: number;
   onRead: () => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const section = useRef<HTMLElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -47,7 +49,7 @@ export function ReleaseNotesCard({
     <section
       className="card settings-section release-notes"
       id="whats-new"
-      aria-label="What’s new"
+      aria-label={t('What’s new')}
       ref={section}
     >
       <button
@@ -64,10 +66,10 @@ export function ReleaseNotesCard({
           <Sparkles size={18} />
         </span>
         <span className="release-label">
-          <span className="release-heading">What’s new</span>
+          <span className="release-heading">{t('What’s new')}</span>
           <span>
-            Version {version}
-            {unread ? ' · New changes available' : ' · Release history'}
+            {t('Version')} {version}
+            {unread ? t(' · New changes available') : t(' · Release history')}
           </span>
         </span>
         <ChevronDown className={open ? 'expanded' : ''} size={18} />
@@ -75,11 +77,15 @@ export function ReleaseNotesCard({
       {latest && (
         <div id="release-history" hidden={!open}>
           <div className="release-title">
-            <span className="eyebrow accent">v{latest.version} · Current version</span>
+            <span className="eyebrow accent">
+              v{latest.version} {t('· Current version')}
+            </span>
             <h3>{latest.title}</h3>
           </div>
           <ReleaseSections release={latest} />
-          {previous.length > 0 && <h3 className="previous-releases-title">Previous versions</h3>}
+          {previous.length > 0 && (
+            <h3 className="previous-releases-title">{t('Previous versions')}</h3>
+          )}
           {previous.map((release) => (
             <details className="previous-release" key={release.version}>
               <summary>

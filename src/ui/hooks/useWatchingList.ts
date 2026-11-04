@@ -1,3 +1,4 @@
+import { t } from '../../shared/i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WatchingListPage } from '../../shared/types';
 import { inExtension, request } from '../services/extension';
@@ -33,7 +34,7 @@ export function useWatchingList(accountId?: number) {
       } catch (error) {
         if (current === revision.current)
           setError({
-            message: error instanceof Error ? error.message : 'Could not load your list.',
+            message: error instanceof Error ? error.message : t('Could not load your list.'),
             offset,
           });
       } finally {

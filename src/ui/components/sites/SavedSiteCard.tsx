@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useId, useState } from 'react';
 import { Check, Globe2, Trash2 } from 'lucide-react';
 import type { SiteConfig } from '../../../shared/types';
@@ -19,6 +20,7 @@ export function SavedSiteCard({
   tabId?: number;
   tabUrl?: string;
 }) {
+  const { t } = useTranslation();
   const fieldId = useId();
   const [titleSelector, setTitleSelector] = useState(site.titleSelector);
   const [episodeSelector, setEpisodeSelector] = useState(site.episodeSelector);
@@ -34,8 +36,8 @@ export function SavedSiteCard({
   }, [site.titleSelector, site.episodeSelector, dirty]);
   function valid() {
     const error =
-      selectorSyntaxError(titleSelector, 'Anime title') ||
-      selectorSyntaxError(episodeSelector, 'Episode');
+      selectorSyntaxError(titleSelector, t('Anime title')) ||
+      selectorSyntaxError(episodeSelector, t('Episode'));
     setError(error);
     return !error;
   }
@@ -47,19 +49,22 @@ export function SavedSiteCard({
     setPreview(undefined);
   }
   return (
-    <section className="card custom-site" aria-label={`Website ${new URL(site.origin).hostname}`}>
+    <section
+      className="card custom-site"
+      aria-label={t('Website {{domain}}', { domain: new URL(site.origin).hostname })}
+    >
       <div className="custom-site-heading">
         <Globe2 size={17} />
         <b>{new URL(site.origin).hostname}</b>
         <button
           className="icon-button danger-icon"
           disabled={!!busy}
-          aria-label={`Remove website ${site.origin}`}
+          aria-label={t('Remove website {{origin}}', { origin: site.origin })}
           onClick={() =>
             void act(
               site.id,
               { type: 'REMOVE_SITE_CONFIG', id: site.id },
-              'Website setup removed. Reload its pages to stop existing scripts.',
+              t('Website setup removed. Reload its pages to stop existing scripts.'),
             )
           }
         >
@@ -67,7 +72,7 @@ export function SavedSiteCard({
         </button>
       </div>
       <details>
-        <summary>Edit selectors</summary>
+        <summary>{t('Edit selectors')}</summary>
         <form
           noValidate
           onSubmit={(event) => {
@@ -76,7 +81,7 @@ export function SavedSiteCard({
             void act(
               site.id,
               { type: 'UPDATE_SITE_CONFIG', id: site.id, titleSelector, episodeSelector },
-              'Selectors saved. Open watch pages are being checked again.',
+              t('Selectors saved. Open watch pages are being checked again.'),
             ).then((ok) => {
               if (ok) {
                 setDirty(false);
@@ -85,7 +90,7 @@ export function SavedSiteCard({
             });
           }}
         >
-          <label htmlFor={`${fieldId}-title`}>Anime title selector</label>
+          <label htmlFor={`${fieldId}-title`}>{t('Anime title selector')}</label>
           <textarea
             id={`${fieldId}-title`}
             rows={2}
@@ -100,7 +105,7 @@ export function SavedSiteCard({
               setPreview(undefined);
             }}
           />
-          <label htmlFor={`${fieldId}-episode`}>Episode selector</label>
+          <label htmlFor={`${fieldId}-episode`}>{t('Episode selector')}</label>
           <textarea
             id={`${fieldId}-episode`}
             rows={2}
@@ -115,7 +120,9 @@ export function SavedSiteCard({
               setPreview(undefined);
             }}
           />
-          <p className="helper">Use CSS selectors. The first matching element supplies its text.</p>
+          <p className="helper">
+            {t('Use CSS selectors. The first matching element supplies its text.')}
+          </p>
           {error && (
             <p role="alert" className="inline-error">
               {error}
@@ -124,16 +131,16 @@ export function SavedSiteCard({
           {preview && (
             <div className="selector-preview" role="status">
               <p className={preview.title.error ? 'warning-text' : ''}>
-                Anime: {selectorPreviewText(preview.title)}
+                {t('Anime:')} {selectorPreviewText(preview.title)}
               </p>
               <p className={preview.episode.error ? 'warning-text' : ''}>
-                Episode: {selectorPreviewText(preview.episode)}
+                {t('Episode:')} {selectorPreviewText(preview.episode)}
               </p>
             </div>
           )}
           <div className="selector-actions">
             <button className="button primary" disabled={!!busy || !dirty} type="submit">
-              <Check size={15} /> Save selectors
+              <Check size={15} /> {t('Save selectors')}
             </button>
             <button
               className="button secondary"
@@ -141,7 +148,7 @@ export function SavedSiteCard({
               type="button"
               onClick={reset}
             >
-              Cancel
+              {t('Cancel')}
             </button>
             {canTest && (
               <button
@@ -159,24 +166,24 @@ export function SavedSiteCard({
                       episodeSelector,
                     });
                     if (!result?.title || !result?.episode)
-                      throw new Error('Reload the watch page, then test the selectors again.');
+                      throw new Error(t('Reload the watch page, then test the selectors again.'));
                     setPreview(result);
                   });
                 }}
               >
-                Test on this page
+                {t('Test on this page')}
               </button>
             )}
           </div>
           {!canTest && (
             <p className="helper">
-              Open an episode on this domain to test the selectors before saving.
+              {t('Open an episode on this domain to test the selectors before saving.')}
             </p>
           )}
         </form>
       </details>
       <p className="helper">
-        Edit the saved selectors here, or run the picker again on this website.
+        {t('Edit the saved selectors here, or run the picker again on this website.')}
       </p>
     </section>
   );

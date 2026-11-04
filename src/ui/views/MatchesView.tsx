@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useState } from 'react';
 import { Link2, Radio } from 'lucide-react';
 import type { Anime } from '../../shared/types';
@@ -10,6 +11,7 @@ import { MatchDetailsForm } from '../components/matching/MatchDetailsForm';
 import { SavedMatches } from '../components/matching/SavedMatches';
 
 export function MatchesView({ state, tabId, busy, act }: ViewProps) {
+  const { t } = useTranslation();
   const session = state.session;
   const identity = `${tabId}/${session?.detection.seriesKey}/${session?.detection.url}`;
   const search = useAnimeSearch(
@@ -24,22 +26,24 @@ export function MatchesView({ state, tabId, busy, act }: ViewProps) {
   return (
     <>
       <div className="page-title">
-        <span className="eyebrow">THE RIGHT ANIME. EVERY TIME.</span>
-        <h1>Make the connection.</h1>
-        <p>Match a watch page once. We’ll remember it.</p>
+        <span className="eyebrow">{t('THE RIGHT ANIME. EVERY TIME.')}</span>
+        <h1>{t('Make the connection.')}</h1>
+        <p>{t('Match a watch page once. We’ll remember it.')}</p>
       </div>
       {session ? (
         <section className="card match-form">
           <div className="eyebrow accent">
-            <Radio size={13} /> DETECTED ON {siteName(session.detection.site).toUpperCase()}
+            <Radio size={13} /> {t('DETECTED ON')} {siteName(session.detection.site).toUpperCase()}
           </div>
           <h3>{session.detection.title}</h3>
           <p className="helper">
-            {session.detection.season ? `Season ${session.detection.season} · ` : ''}Episode{' '}
-            {session.detection.episode ?? 'unknown'} on the streaming site
+            {session.detection.season
+              ? t('Season {{season}} · ', { season: session.detection.season })
+              : ''}
+            {t('Episode')} {session.detection.episode ?? t('unknown')} {t('on the streaming site')}
           </p>
           {!state.connected ? (
-            <div className="callout">Sign in to MyAnimeList to search and save a match.</div>
+            <div className="callout">{t('Sign in to MyAnimeList to search and save a match.')}</div>
           ) : (
             <div className="match-workspace">
               {selected ? (
@@ -66,8 +70,8 @@ export function MatchesView({ state, tabId, busy, act }: ViewProps) {
       ) : (
         <div className="card compact-empty">
           <Link2 size={24} />
-          <h3>Start with a watch page</h3>
-          <p>Open an episode to search for a match and save its URL rule.</p>
+          <h3>{t('Start with a watch page')}</h3>
+          <p>{t('Open an episode to search for a match and save its URL rule.')}</p>
         </div>
       )}
       <SavedMatches mappings={state.mappings} busy={busy} act={act} />

@@ -1,3 +1,6 @@
+import { Trans, useTranslation } from 'react-i18next';
+import { initializeI18n } from '../i18n';
+import { i18n } from '../../shared/i18n';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { GuidancePrompt, PendingUpdate } from '../../shared/types';
@@ -6,6 +9,7 @@ import { progressListNote } from '../lib/display';
 import './prompt.css';
 
 function EpisodePrompt() {
+  const { t } = useTranslation();
   const nonce = location.hash.slice(1);
   const [prompt, setPrompt] = useState<PendingUpdate | GuidancePrompt>();
   const guidance = prompt && 'kind' in prompt ? prompt : undefined;
@@ -60,7 +64,7 @@ function EpisodePrompt() {
     try {
       await request({ type: 'INLINE_PROMPT_ACTION', nonce, action });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Update failed. Try again or open Malmark.');
+      setError(e instanceof Error ? e.message : t('Update failed. Try again or open Malmark.'));
       setBusy(false);
     }
   }
@@ -76,20 +80,23 @@ function EpisodePrompt() {
         await request({ type: 'GUIDANCE_ACTION', nonce, action });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Open Malmark to continue.');
+      setError(e instanceof Error ? e.message : t('Open Malmark to continue.'));
       setBusy(false);
     }
   }
   return (
-    <main ref={panel} aria-label={guidance ? 'Malmark watch setup' : 'Malmark episode reminder'}>
-      <div className="brand">MALMARK</div>
+    <main
+      ref={panel}
+      aria-label={guidance ? t('Malmark watch setup') : t('Malmark episode reminder')}
+    >
+      <div className="brand">{'MALMARK'}</div>
       <h1>
         {item
-          ? `Episode ${item.episode} is ready to log`
+          ? t('Episode {{episode}} is ready to log', { episode: item.episode })
           : guidance?.kind === 'player'
-            ? 'Connect the video player'
+            ? t('Connect the video player')
             : guidance
-              ? 'Find the right anime'
+              ? t('Find the right anime')
               : 'Malmark'}
       </h1>
       {guidance && (
@@ -97,8 +104,10 @@ function EpisodePrompt() {
           <p className="anime">{guidance.title}</p>
           <p>
             {guidance.kind === 'player'
-              ? 'Allow the domain used by your video so Malmark can read playback time.'
-              : 'Malmark couldn’t match this title on MyAnimeList. Choose the correct anime to start tracking.'}
+              ? t('Allow the domain used by your video so Malmark can read playback time.')
+              : t(
+                  'Malmark couldn’t match this title on MyAnimeList. Choose the correct anime to start tracking.',
+                )}
           </p>
           {guidance.kind === 'player' && (
             <div className="player-domains">
@@ -111,7 +120,7 @@ function EpisodePrompt() {
                       if (e.nativeEvent.isTrusted) void guide('player', origin);
                     }}
                   >
-                    Allow
+                    {t('Allow')}
                   </button>
                 </div>
               ))}
@@ -125,7 +134,7 @@ function EpisodePrompt() {
                   if (e.nativeEvent.isTrusted) void guide('match');
                 }}
               >
-                Find match
+                {t('Find match')}
               </button>
             )}
             <button
@@ -135,7 +144,7 @@ function EpisodePrompt() {
                 if (e.nativeEvent.isTrusted) void guide('dismiss');
               }}
             >
-              Later
+              {t('Later')}
             </button>
           </div>
         </>
@@ -144,13 +153,19 @@ function EpisodePrompt() {
         <>
           <p className="anime">{item.anime.alternative_titles?.en || item.anime.title}</p>
           <p>
-            Update MyAnimeList from <b>{item.previous}</b> to <b>{item.episode}</b> watched
-            episodes?
+            <Trans
+              i18nKey="Update MyAnimeList from <previous>{{previous}}</previous> to <episode>{{episode}}</episode> watched episodes?"
+              values={{ previous: item.previous, episode: item.episode }}
+              components={{ previous: <b />, episode: <b /> }}
+            />
           </p>
           {progressListNote(item.anime) && <p>{progressListNote(item.anime)}</p>}
           {item.episode > item.previous + 1 && (
             <p className="warning">
-              This also marks episodes {item.previous + 1}–{item.episode - 1} as watched.
+              {t('This also marks episodes {{first}}–{{last}} as watched.', {
+                first: item.previous + 1,
+                last: item.episode - 1,
+              })}
             </p>
           )}
           {item.error && <p className="warning">{item.error}</p>}
@@ -161,7 +176,7 @@ function EpisodePrompt() {
                 if (e.nativeEvent.isTrusted) void act('approve');
               }}
             >
-              {busy ? 'Saving…' : 'Update progress'}
+              {busy ? t('Saving…') : t('Update progress')}
             </button>
             <button
               className="later"
@@ -170,10 +185,10 @@ function EpisodePrompt() {
                 if (e.nativeEvent.isTrusted) void act('later');
               }}
             >
-              Later
+              {t('Later')}
             </button>
           </div>
-          <small>Later keeps this update in Malmark for you to confirm.</small>
+          <small>{t('Later keeps this update in Malmark for you to confirm.')}</small>
         </>
       )}
       {error && (
@@ -184,4 +199,10 @@ function EpisodePrompt() {
     </main>
   );
 }
+await initializeI18n();
+const updateLanguage = () => {
+  document.documentElement.lang = i18n.resolvedLanguage || 'en';
+};
+i18n.on('languageChanged', updateLanguage);
+updateLanguage();
 createRoot(document.getElementById('root')!).render(<EpisodePrompt />);

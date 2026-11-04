@@ -117,7 +117,7 @@ test('completion and scoring require approval, fresh Finished Airing data, and a
     await popup.getByRole('button', { name: 'Complete & rate' }).click();
     await popup.getByLabel('Your score').selectOption('9');
     await popup.getByRole('button', { name: 'Save completion' }).click();
-    await expect(popup.locator('.list-status b')).toHaveText('completed');
+    await expect(popup.locator('.list-status b')).toHaveText('Completed');
     await expect(popup.getByText('Your score: 9/10', { exact: true })).toBeVisible();
     expect(await worker.evaluate(() => (globalThis as any).testWrites)).toEqual([
       { animeId: 1, body: 'status=completed&num_watched_episodes=12&score=9' },

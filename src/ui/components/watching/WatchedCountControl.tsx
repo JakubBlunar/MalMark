@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
 import { Check, Minus, Plus } from 'lucide-react';
 import type { Anime } from '../../../shared/types';
@@ -16,6 +17,7 @@ export function WatchedCountControl({
   busy: string;
   act: Act;
 }) {
+  const { t } = useTranslation();
   const watched = anime.my_list_status?.num_episodes_watched ?? 0;
   const [count, setCount] = useState(String(watched));
   useEffect(() => setCount(String(watched)), [anime.id, watched]);
@@ -32,12 +34,12 @@ export function WatchedCountControl({
         void act(
           'watched',
           { type: 'SET_WATCHED', animeId: anime.id, episode: target, expectedPrevious: watched },
-          `MAL progress set to ${target} watched episodes.`,
+          t('MAL progress set to {{count}} watched episodes.', { count: target }),
         );
       }}
     >
       <div className="watched-heading">
-        <label htmlFor="watched-count">Watched on MAL</label>
+        <label htmlFor="watched-count">{t('Watched on MAL')}</label>
         {episode !== null && episode <= max && episode !== target && (
           <button
             className="text-button"
@@ -45,7 +47,7 @@ export function WatchedCountControl({
             disabled={!!busy}
             onClick={() => setCount(String(episode))}
           >
-            Use episode {episode}
+            {t('Use episode')} {episode}
           </button>
         )}
       </div>
@@ -53,7 +55,7 @@ export function WatchedCountControl({
         <div className="count-stepper">
           <button
             type="button"
-            aria-label="Decrease watched episodes"
+            aria-label={t('Decrease watched episodes')}
             disabled={!!busy || !valid || target <= 0}
             onClick={() => setCount(String(target - 1))}
           >
@@ -61,7 +63,7 @@ export function WatchedCountControl({
           </button>
           <input
             id="watched-count"
-            aria-label="Watched episodes on MAL"
+            aria-label={t('Watched episodes on MAL')}
             type="number"
             required
             min="0"
@@ -73,7 +75,7 @@ export function WatchedCountControl({
           />
           <button
             type="button"
-            aria-label="Increase watched episodes"
+            aria-label={t('Increase watched episodes')}
             disabled={!!busy || !valid || target >= max}
             onClick={() => setCount(String(target + 1))}
           >
@@ -81,18 +83,25 @@ export function WatchedCountControl({
           </button>
         </div>
         <button className="button secondary" disabled={!!busy || !valid || target === watched}>
-          {busy === 'watched' ? <Spinner /> : <Check size={14} />} Save to MAL
+          {busy === 'watched' ? <Spinner /> : <Check size={14} />} {t('Save to MAL')}
         </button>
       </div>
       <p className={`helper ${valid && target < watched ? 'warning-text' : ''}`}>
         {valid && target !== watched
-          ? `${target < watched ? 'Reduces' : 'Updates'} your watched total from ${watched} to ${target}.`
+          ? t(
+              target < watched
+                ? 'Reduces your watched total from {{previous}} to {{count}}.'
+                : 'Updates your watched total from {{previous}} to {{count}}.',
+              { previous: watched, count: target },
+            )
           : fullyLogged
-            ? 'Already fully logged. Rewatching keeps this total unless you save a different count.'
-            : 'Adjust the total anytime, even if the player skipped ahead.'}
+            ? t(
+                'Already fully logged. Rewatching keeps this total unless you save a different count.',
+              )
+            : t('Adjust the total anytime, even if the player skipped ahead.')}
       </p>
       {valid && target < watched && (
-        <p className="helper">Later episodes will be tracked again from this count.</p>
+        <p className="helper">{t('Later episodes will be tracked again from this count.')}</p>
       )}
       {valid && target > watched && progressListNote(anime) && (
         <p className="helper">{progressListNote(anime)}</p>

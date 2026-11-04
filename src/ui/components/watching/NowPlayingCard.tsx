@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ChevronRight, CircleAlert, CircleCheck } from 'lucide-react';
 import type { Settings, WatchSession } from '../../../shared/types';
 import type { Act, Navigate } from '../../types';
@@ -23,11 +24,12 @@ export function NowPlayingCard({
   act: Act;
   go: Navigate;
 }) {
+  const { t } = useTranslation();
   const anime = s.anime;
   return (
     <section className="card watching-card">
       <div className="card-topline">
-        <span className="eyebrow">NOW PLAYING</span>
+        <span className="eyebrow">{t('NOW PLAYING')}</span>
         <span className={`site-pill ${s.detection.site}`}>{siteName(s.detection.site)}</span>
       </div>
       <AnimeInfo session={s} />
@@ -35,11 +37,15 @@ export function NowPlayingCard({
         {anime ? <CircleCheck size={15} /> : <CircleAlert size={15} />}
         <span>
           {anime
-            ? `${s.matchSource === 'manual' ? 'Saved match' : 'Matched'} on MyAnimeList`
-            : 'Let’s find the right anime'}
+            ? t(
+                s.matchSource === 'manual'
+                  ? 'Saved match on MyAnimeList'
+                  : 'Matched on MyAnimeList',
+              )
+            : t('Let’s find the right anime')}
         </span>
         <button onClick={() => go('matches')}>
-          {anime ? 'Change' : 'Find match'}
+          {anime ? t('Change') : t('Find match')}
           <ChevronRight size={14} />
         </button>
       </div>
@@ -48,8 +54,9 @@ export function NowPlayingCard({
       <AnimeListStatus anime={anime} tabId={tabId} busy={busy} act={act} />
       {anime?.my_list_status?.is_rewatching && (
         <p className="helper callout">
-          Rewatch detected. Update rewatch progress directly on MAL; Malmark keeps the original
-          watch count intact.
+          {t(
+            'Rewatch detected. Update rewatch progress directly on MAL; Malmark keeps the original watch count intact.',
+          )}
         </p>
       )}
       {anime && !anime.my_list_status?.is_rewatching && (
@@ -66,7 +73,9 @@ export function NowPlayingCard({
       )}
       {s.episode && anime?.num_episodes && s.episode > anime.num_episodes ? (
         <div className="callout warning-text">
-          Episode {s.episode} exceeds this MAL entry. Set an episode offset in Matches.
+          {t('Episode {{episode}} exceeds this MAL entry. Set an episode offset in Matches.', {
+            episode: s.episode,
+          })}
         </div>
       ) : null}
     </section>

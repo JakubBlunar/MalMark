@@ -44,6 +44,8 @@ Previews support `?demo=watching`, `?demo=pending`, `?demo=unmatched`, `?demo=fi
 
 The UI is organized into `src/ui/views`, `components`, `hooks`, `services`, and `styles`. Other code lives in `src/content` (detection/player/picker), `src/background` (MAL, permissions, storage), and `src/shared`. `scripts/build.mjs` creates the browser-specific manifests and generates dependency notices from the bundled modules.
 
+Localization uses i18next and react-i18next, with separate language files loaded on demand. See [LOCALIZATION.md](LOCALIZATION.md) for language selection, translation conventions, and adding languages.
+
 ## MyAnimeList OAuth
 
 Default builds and GitHub release ZIPs use each user’s own public client ID, entered on the sign-in screen. No `.env` is needed. The callback is read from the browser, so it matches the installed extension. Unpacked Chromium IDs can change when the folder moves; update the registered callback through **Edit API setup** if needed. Firefox uses the explicit ID `malmark@mal-episode-watcher.local`.

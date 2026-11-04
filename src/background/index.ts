@@ -1,4 +1,5 @@
 import browser from 'webextension-polyfill';
+import { isLanguagePreference, languageStorageKey } from '../shared/localization';
 import type {
   Anime,
   Detection,
@@ -901,6 +902,13 @@ browser.runtime.onMessage.addListener((raw: unknown, sender: browser.Runtime.Mes
       (p) => sender.url!.split('?')[0].split('#')[0] === browser.runtime.getURL(p),
     );
   const handle = async (): Promise<unknown> => {
+    if (message.type === 'GET_LANGUAGE_PREFERENCE') {
+      // Content scripts cannot read protected token storage. Return only this public preference.
+      const value: unknown = (await browser.storage.local.get(languageStorageKey))[
+        languageStorageKey
+      ];
+      return isLanguagePreference(value) ? value : 'auto';
+    }
     if (trustedUi) {
       // Fetch outside the state queue so profile/list loading does not delay playback or logout.
       if (message.type === 'REFRESH_PROFILE') return refreshProfile();
@@ -1094,6 +1102,24 @@ browser.runtime.onMessage.addListener((raw: unknown, sender: browser.Runtime.Mes
     (data) => ({ ok: true, data }),
     (error) => ({ ok: false, error: errorText(error) }),
   );
+});
+
+browser.storage.onChanged?.addListener((changes, area) => {
+  if (area !== 'local' || !changes[languageStorageKey]) return;
+  const value: unknown = changes[languageStorageKey].newValue;
+  const preference = isLanguagePreference(value) ? value : 'auto';
+  void browser.tabs
+    .query({})
+    .then((tabs) =>
+      Promise.allSettled(
+        tabs.flatMap((tab) =>
+          tab.id === undefined
+            ? []
+            : [browser.tabs.sendMessage(tab.id, { type: 'LANGUAGE_CHANGED', preference })],
+        ),
+      ),
+    )
+    .catch(() => undefined);
 });
 
 browser.tabs.onRemoved.addListener((tabId) => {

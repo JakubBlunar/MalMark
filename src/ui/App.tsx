@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useState } from 'react';
 import { inExtension } from './services/extension';
 import { AppHeader } from './components/layout/AppHeader';
@@ -15,6 +16,7 @@ import { MyListView } from './views/MyListView';
 import { popup } from './lib/surface';
 
 export function App() {
+  const { t } = useTranslation();
   const {
     state,
     view,
@@ -59,7 +61,7 @@ export function App() {
         <main>
           {!inExtension && (
             <div className="preview-banner">
-              LOCAL UI PREVIEW <span>Extension actions are disabled</span>
+              {t('LOCAL UI PREVIEW')} <span>{t('Extension actions are disabled')}</span>
             </div>
           )}
           {error && <Notice message={error} variant="error" onDismiss={() => setError('')} />}

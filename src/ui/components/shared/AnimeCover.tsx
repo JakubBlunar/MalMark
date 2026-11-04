@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
 import { Film } from 'lucide-react';
 import type { Anime } from '../../../shared/types';
@@ -11,6 +12,7 @@ export function AnimeCover({
   large?: boolean;
   lazy?: boolean;
 }) {
+  const { t } = useTranslation();
   const [broken, setBroken] = useState(false);
   const picture = large
     ? anime?.main_picture?.large || anime?.main_picture?.medium
@@ -29,7 +31,7 @@ export function AnimeCover({
         <>
           <div className="cover-orbit" />
           <Film size={large ? 32 : 20} />
-          <span>ANIME</span>
+          <span>{t('ANIME')}</span>
         </>
       )}
     </div>

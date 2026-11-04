@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ShieldCheck } from 'lucide-react';
 import type { PublicState } from '../../shared/types';
 import type { Act } from '../types';
@@ -15,23 +16,26 @@ export function SitesView({
   busy: string;
   act: Act;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <div className="page-title">
-        <span className="eyebrow">YOUR WEBSITE. YOUR WAY.</span>
-        <h1>Pick it. Track it.</h1>
-        <p>Teach Malmark where to find the title and episode.</p>
+        <span className="eyebrow">{t('YOUR WEBSITE. YOUR WAY.')}</span>
+        <h1>{t('Pick it. Track it.')}</h1>
+        <p>{t('Teach Malmark where to find the title and episode.')}</p>
       </div>
       <SiteSetupCard url={state.tabUrl} tabId={tabId} busy={busy} act={act} />
       <div className="list-heading">
-        <h2>Your websites</h2>
-        <span>{state.sites.length} CUSTOM</span>
+        <h2>{t('Your websites')}</h2>
+        <span>
+          {state.sites.length} {t('CUSTOM')}
+        </span>
       </div>
       <div className="card builtin-sites">
         <div>
           <span className="cr-mark">◔</span>
-          <b>Crunchyroll</b>
-          <small>BUILT IN · PRIMARY</small>
+          <b>{'Crunchyroll'}</b>
+          <small>{t('BUILT IN · PRIMARY')}</small>
         </div>
       </div>
       {state.sites.map((site) => (
@@ -46,7 +50,7 @@ export function SitesView({
       ))}
       <div className="subtle-note">
         <ShieldCheck size={14} />
-        <span>Only websites you choose get access.</span>
+        <span>{t('Only websites you choose get access.')}</span>
       </div>
     </>
   );

@@ -31,7 +31,11 @@ const mock = vi.hoisted(() => {
     }),
   });
   const browser = {
-    storage: { local: area('local'), session: area('session') },
+    storage: {
+      local: area('local'),
+      session: area('session'),
+      onChanged: { addListener: vi.fn() },
+    },
     runtime: {
       id: 'test',
       getURL: (p: string) => `moz-extension://test/${p}`,
@@ -135,6 +139,10 @@ const historyListener = mock.browser.webNavigation.onHistoryStateUpdated.addList
   .calls[0][0] as (details: { tabId: number; frameId: number; url: string }) => void;
 const permissionsAdded = mock.browser.permissions.onAdded.addListener.mock
   .calls[0][0] as (permissions: { origins?: string[] }) => Promise<void>;
+const languageStorageChanged = mock.browser.storage.onChanged.addListener.mock.calls[0][0] as (
+  changes: unknown,
+  area: string,
+) => void;
 async function message<T = unknown>(
   value: unknown,
   sender: Record<string, unknown> = ui,
@@ -195,6 +203,32 @@ beforeEach(async () => {
   mock.browser.webNavigation.getFrame.mockReset().mockResolvedValue(null);
   mock.browser.webNavigation.getAllFrames.mockResolvedValue([]);
 });
+describe('content language preferences', () => {
+  it('returns only a validated preference to content scripts', async () => {
+    await mock.browser.storage.local.set({ languagePreference: 'sk' });
+    expect(await message({ type: 'GET_LANGUAGE_PREFERENCE' }, content)).toEqual({
+      ok: true,
+      data: 'sk',
+    });
+    await mock.browser.storage.local.set({ languagePreference: '../../invalid' });
+    expect(await message({ type: 'GET_LANGUAGE_PREFERENCE' }, content)).toEqual({
+      ok: true,
+      data: 'auto',
+    });
+    expect(mock.getLocal().auth).toEqual(auth);
+  });
+  it('broadcasts only the public preference when local language storage changes', async () => {
+    mock.browser.tabs.query.mockResolvedValueOnce([{ id: 1, url: content.url }]);
+    languageStorageChanged({ languagePreference: { newValue: 'pl' } }, 'local');
+    await vi.waitFor(() =>
+      expect(mock.browser.tabs.sendMessage).toHaveBeenCalledWith(1, {
+        type: 'LANGUAGE_CHANGED',
+        preference: 'pl',
+      }),
+    );
+  });
+});
+
 describe('OAuth and MAL transport', () => {
   it('loads watching-list pages with progress from list_status using only authenticated reads', async () => {
     const status = { status: 'watching', num_episodes_watched: 4, score: 8 };

@@ -1,3 +1,4 @@
+import { t } from '../../shared/i18n';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { PublicState, Message } from '../../shared/types';
 import type { View } from '../types';
@@ -108,7 +109,7 @@ export function useAppController() {
     setNotice('');
     try {
       if (!inExtension) {
-        setNotice('Browser preview · Load the built extension to use this action.');
+        setNotice(t('Browser preview · Load the built extension to use this action.'));
         return false;
       }
       if (typeof task === 'function') await task();
@@ -142,7 +143,7 @@ export function useAppController() {
       if (inExtension) await request({ type: 'MARK_RELEASE_NOTES_READ' });
       setState((previous) => previous && { ...previous, releaseNotesUnread: false });
     } catch {
-      setError('Could not mark release notes as read. Open them again to retry.');
+      setError(t('Could not mark release notes as read. Open them again to retry.'));
     }
   }, []);
 

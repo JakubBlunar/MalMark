@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { BookOpen, Link2, Trash2 } from 'lucide-react';
 import type { Mapping } from '../../../shared/types';
 import type { Act } from '../../types';
@@ -11,11 +12,14 @@ export function SavedMatches({
   busy: string;
   act: Act;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <div className="list-heading">
-        <h2>Saved matches</h2>
-        <span>{mappings.length} LOCAL</span>
+        <h2>{t('Saved matches')}</h2>
+        <span>
+          {mappings.length} {t('LOCAL')}
+        </span>
       </div>
       {mappings.length ? (
         <div className="card saved-list">
@@ -28,20 +32,20 @@ export function SavedMatches({
                 <b>{mapping.animeTitle}</b>
                 <small title={mapping.prefix}>{mapping.prefix}</small>
                 <span>
-                  Offset {mapping.episodeOffset > 0 ? '+' : ''}
+                  {t('Offset')} {mapping.episodeOffset > 0 ? '+' : ''}
                   {mapping.episodeOffset}
-                  {mapping.season ? ` · Season ${mapping.season}` : ''}
+                  {mapping.season ? t(' · Season {{season}}', { season: mapping.season }) : ''}
                 </span>
               </div>
               <button
                 className="icon-button danger-icon"
-                aria-label={`Delete match for ${mapping.animeTitle}`}
+                aria-label={t('Delete match for {{title}}', { title: mapping.animeTitle })}
                 disabled={!!busy}
                 onClick={() =>
                   void act(
                     mapping.id,
                     { type: 'REMOVE_MAPPING', id: mapping.id },
-                    'Saved match removed.',
+                    t('Saved match removed.'),
                   )
                 }
               >
@@ -54,9 +58,9 @@ export function SavedMatches({
         <div className="dashed-empty">
           <BookOpen size={19} />
           <p>
-            Your saved matches will live here.
+            {t('Your saved matches will live here.')}
             <br />
-            <span>Stored on this browser, just for you.</span>
+            <span>{t('Stored on this browser, just for you.')}</span>
           </p>
         </div>
       )}

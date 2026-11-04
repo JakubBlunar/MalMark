@@ -1,5 +1,7 @@
+import { useTranslation } from 'react-i18next';
 import { LoaderCircle } from 'lucide-react';
 
 export function Spinner() {
-  return <LoaderCircle size={16} className="spin" aria-label="Loading" />;
+  const { t } = useTranslation();
+  return <LoaderCircle size={16} className="spin" aria-label={t('Loading')} />;
 }

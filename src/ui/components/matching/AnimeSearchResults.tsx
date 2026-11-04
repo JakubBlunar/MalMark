@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ArrowRight, ChevronRight, Search } from 'lucide-react';
 import type { Anime } from '../../../shared/types';
 import type { AnimeSearch } from '../../hooks/useAnimeSearch';
@@ -13,6 +14,7 @@ export function AnimeSearchResults({
   busy: string;
   onSelect: (anime: Anime) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <form
@@ -22,7 +24,7 @@ export function AnimeSearchResults({
           void search.submit();
         }}
       >
-        <label htmlFor="anime-search">Search MyAnimeList</label>
+        <label htmlFor="anime-search">{t('Search MyAnimeList')}</label>
         <div className="search-input">
           <Search size={17} />
           <input
@@ -32,9 +34,13 @@ export function AnimeSearchResults({
             maxLength={100}
             value={search.query}
             onChange={(event) => search.setQuery(event.target.value)}
-            placeholder="Anime title or season…"
+            placeholder={t('Anime title or season…')}
           />
-          <button disabled={search.searching || !!busy} aria-label="Search anime" type="submit">
+          <button
+            disabled={search.searching || !!busy}
+            aria-label={t('Search anime')}
+            type="submit"
+          >
             {search.searching ? <Spinner /> : <ArrowRight size={17} />}
           </button>
         </div>
@@ -46,7 +52,7 @@ export function AnimeSearchResults({
       )}
       {search.searched && !search.results.length && !search.searching && (
         <p className="helper callout">
-          No results. Try the Japanese title or include the season number.
+          {t('No results. Try the Japanese title or include the season number.')}
         </p>
       )}
       <div className="search-results">
@@ -57,7 +63,7 @@ export function AnimeSearchResults({
               <b>{anime.title}</b>
               <small>
                 {anime.alternative_titles?.en || 'MyAnimeList'} · {anime.start_season?.year || '—'}{' '}
-                · {anime.num_episodes || '?'} ep
+                · {anime.num_episodes || '?'} {t('ep')}
               </small>
             </span>
             <ChevronRight size={16} />

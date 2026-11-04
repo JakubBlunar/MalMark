@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import {
   ArrowRight,
   CircleCheck,
@@ -18,6 +19,8 @@ export function ProfileView({
   act,
   signIn,
 }: ViewProps & { signIn: () => Promise<void> }) {
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage;
   const [freshProfile, setFreshProfile] = useState<Profile>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -47,9 +50,9 @@ export function ProfileView({
   return (
     <>
       <div className="page-title">
-        <span className="eyebrow">YOUR LITTLE ANIME CORNER</span>
-        <h1>Profile</h1>
-        <p>Your MyAnimeList account, at a glance.</p>
+        <span className="eyebrow">{t('YOUR LITTLE ANIME CORNER')}</span>
+        <h1>{t('Profile')}</h1>
+        <p>{t('Your MyAnimeList account, at a glance.')}</p>
       </div>
       {profile ? (
         <>
@@ -59,13 +62,13 @@ export function ProfileView({
             </div>
             <h2>{profile.name}</h2>
             <span className="connected-label">
-              <i /> Connected to MyAnimeList
+              <i /> {t('Connected to MyAnimeList')}
             </span>
             {profile.location && <p>{profile.location}</p>}
             {profile.joined_at && (
               <p className="helper">
-                Member since{' '}
-                {new Date(profile.joined_at).toLocaleDateString(undefined, {
+                {t('Member since')}{' '}
+                {new Date(profile.joined_at).toLocaleDateString(language, {
                   month: 'long',
                   year: 'numeric',
                 })}
@@ -77,7 +80,7 @@ export function ProfileView({
               target="_blank"
               rel="noreferrer"
             >
-              View MAL profile <ExternalLink size={14} />
+              {t('View MAL profile')} <ExternalLink size={14} />
             </a>
           </section>
           {stats && (
@@ -85,43 +88,50 @@ export function ProfileView({
               <div>
                 <TvMinimal size={18} />
                 <b>{stats.num_items_watching}</b>
-                <span>Watching</span>
+                <span>{t('Watching')}</span>
               </div>
               <div>
                 <CircleCheck size={18} />
                 <b>{stats.num_items_completed}</b>
-                <span>Completed</span>
+                <span>{t('Completed')}</span>
               </div>
               <div>
                 <Play size={18} />
-                <b>{stats.num_episodes.toLocaleString()}</b>
-                <span>Episodes</span>
+                <b>{stats.num_episodes.toLocaleString(language)}</b>
+                <span>{t('Episodes')}</span>
               </div>
               <div>
                 <Film size={18} />
-                <b>{stats.num_days_watched.toFixed(1)}</b>
-                <span>Days watched</span>
+                <b>
+                  {stats.num_days_watched.toLocaleString(language, {
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                  })}
+                </b>
+                <span>{t('Days watched')}</span>
               </div>
             </div>
           )}
           <div className="helper centered" aria-live="polite">
             {error ? (
               <>
-                <p role="alert">Couldn’t refresh your profile. Showing saved statistics. {error}</p>
+                <p role="alert">
+                  {t('Couldn’t refresh your profile. Showing saved statistics.')} {error}
+                </p>
                 <button
                   className="text-button"
                   onClick={() => setAttempt((attempt) => attempt + 1)}
                 >
-                  Try again
+                  {t('Try again')}
                 </button>
               </>
             ) : (
               <p>
                 {loading
-                  ? 'Refreshing statistics…'
+                  ? t('Refreshing statistics…')
                   : freshProfile
-                    ? 'Statistics refreshed from MyAnimeList.'
-                    : 'Statistics refresh when you open your profile.'}
+                    ? t('Statistics refreshed from MyAnimeList.')
+                    : t('Statistics refresh when you open your profile.')}
               </p>
             )}
           </div>
@@ -132,11 +142,11 @@ export function ProfileView({
               void act(
                 'logout',
                 { type: 'LOGOUT' },
-                'Disconnected. Your saved matches are still on this device.',
+                t('Disconnected. Your saved matches are still on this device.'),
               )
             }
           >
-            <LogOut size={16} /> Disconnect account
+            <LogOut size={16} /> {t('Disconnect account')}
           </button>
         </>
       ) : (
@@ -144,10 +154,10 @@ export function ProfileView({
           <div className="empty-icon">
             <UserRound size={30} />
           </div>
-          <h2>Make yourself at home.</h2>
-          <p>Connect your account to see your profile and keep your list up to date.</p>
+          <h2>{t('Make yourself at home.')}</h2>
+          <p>{t('Connect your account to see your profile and keep your list up to date.')}</p>
           <button className="button primary wide" disabled={!!busy} onClick={() => void signIn()}>
-            Connect MyAnimeList <ArrowRight size={16} />
+            {t('Connect MyAnimeList')} <ArrowRight size={16} />
           </button>
         </section>
       )}

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ExternalLink, ListVideo, RefreshCw } from 'lucide-react';
 import type { ViewProps } from '../types';
 import { useWatchingList } from '../hooks/useWatchingList';
@@ -5,13 +6,14 @@ import { AnimeCover } from '../components/shared/AnimeCover';
 import { Spinner } from '../components/shared/Spinner';
 
 export function MyListView({ state }: Pick<ViewProps, 'state'>) {
+  const { t } = useTranslation();
   const { data, loading, error, load } = useWatchingList(state.profile?.id);
   return (
     <>
       <div className="page-title">
-        <span className="eyebrow">ONE MORE EPISODE</span>
-        <h1>Currently watching</h1>
-        <p>Your MyAnimeList progress, ready when you are.</p>
+        <span className="eyebrow">{t('ONE MORE EPISODE')}</span>
+        <h1>{t('Currently watching')}</h1>
+        <p>{t('Your MyAnimeList progress, ready when you are.')}</p>
       </div>
       <div className="my-list-toolbar">
         {state.profile?.name && (
@@ -21,11 +23,11 @@ export function MyListView({ state }: Pick<ViewProps, 'state'>) {
             rel="noreferrer"
             href={`https://myanimelist.net/animelist/${encodeURIComponent(state.profile.name)}`}
           >
-            Full list on MAL <ExternalLink size={13} />
+            {t('Full list on MAL')} <ExternalLink size={13} />
           </a>
         )}
         <button className="text-button" disabled={loading} onClick={() => void load()}>
-          {loading ? <Spinner /> : <RefreshCw size={14} />} Refresh
+          {loading ? <Spinner /> : <RefreshCw size={14} />} {t('Refresh')}
         </button>
       </div>
       {error && (
@@ -36,28 +38,28 @@ export function MyListView({ state }: Pick<ViewProps, 'state'>) {
             disabled={loading}
             onClick={() => void load(error.offset)}
           >
-            Try again
+            {t('Try again')}
           </button>
         </div>
       )}
       {loading && (
         <p className="helper" role="status">
-          Loading your watching list…
+          {t('Loading your watching list…')}
         </p>
       )}
       {data && (
         <>
           <div className="list-heading">
-            <h2>Your anime</h2>
+            <h2>{t('Your anime')}</h2>
             <span>
-              {data.items.length} {data.nextOffset !== undefined ? 'LOADED' : 'WATCHING'}
+              {data.items.length} {data.nextOffset !== undefined ? t('LOADED') : t('WATCHING')}
             </span>
           </div>
           {!data.items.length && (
             <div className="card compact-empty">
               <ListVideo size={26} />
-              <h3>A new story is waiting.</h3>
-              <p>Anime marked Watching on MyAnimeList will appear here.</p>
+              <h3>{t('A new story is waiting.')}</h3>
+              <p>{t('Anime marked Watching on MyAnimeList will appear here.')}</p>
             </div>
           )}
           <div className="my-list-items">
@@ -73,7 +75,11 @@ export function MyListView({ state }: Pick<ViewProps, 'state'>) {
                   href={`https://myanimelist.net/anime/${anime.id}`}
                   target="_blank"
                   rel="noreferrer"
-                  aria-label={`${title}, ${watched} of ${total || 'unknown'} episodes`}
+                  aria-label={t('{{title}}, {{watched}} of {{total}} episodes', {
+                    title,
+                    watched,
+                    total: total || t('unknown'),
+                  })}
                 >
                   <AnimeCover anime={anime} lazy />
                   <div className="my-list-copy">
@@ -82,20 +88,20 @@ export function MyListView({ state }: Pick<ViewProps, 'state'>) {
                       <p className="my-list-original">{anime.title}</p>
                     )}
                     <p className="my-list-count">
-                      <b>{watched}</b> / {total || '?'} episodes
+                      <b>{watched}</b> / {total || '?'} {t('episodes', { count: total || 5 })}
                     </p>
                     {total > 0 && (
                       <progress
                         value={Math.min(watched, total)}
                         max={total}
-                        aria-label={`${title} watch progress`}
+                        aria-label={t('{{title}} watch progress', { title })}
                       />
                     )}
                     <small>
-                      {anime.my_list_status?.is_rewatching ? 'Rewatching · ' : ''}
+                      {anime.my_list_status?.is_rewatching ? t('Rewatching · ') : ''}
                       {total && watched >= total
-                        ? 'All episodes logged'
-                        : `Next: episode ${watched + 1}`}
+                        ? t('All episodes logged')
+                        : t('Next: episode {{episode}}', { episode: watched + 1 })}
                     </small>
                   </div>
                   <ExternalLink className="my-list-external" size={14} />
@@ -109,12 +115,12 @@ export function MyListView({ state }: Pick<ViewProps, 'state'>) {
               disabled={loading}
               onClick={() => void load(data.nextOffset)}
             >
-              Load more
+              {t('Load more')}
             </button>
           )}
           {!!data.items.length && (
             <p className="helper centered">
-              Recently updated first · Progress saved on MyAnimeList
+              {t('Recently updated first · Progress saved on MyAnimeList')}
             </p>
           )}
         </>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import type { WatchSession } from '../../../shared/types';
@@ -14,6 +15,7 @@ export function EpisodeCorrection({
   busy: string;
   act: Act;
 }) {
+  const { t } = useTranslation();
   const [episodeInput, setEpisodeInput] = useState('');
   const [editingEpisode, setEditingEpisode] = useState(false);
   return (
@@ -26,16 +28,16 @@ export function EpisodeCorrection({
             setEpisodeInput(String(s.episode || ''));
           }}
         >
-          Correct episode
+          {t('Correct episode')}
         </button>
         <button
           disabled={!!busy}
           className="text-button muted"
           onClick={() =>
-            void act('recheck', { type: 'RECHECK', tabId: tabId! }, 'Page checked again.')
+            void act('recheck', { type: 'RECHECK', tabId: tabId! }, t('Page checked again.'))
           }
         >
-          <RefreshCw size={13} className={busy === 'recheck' ? 'spin' : ''} /> Check again
+          <RefreshCw size={13} className={busy === 'recheck' ? 'spin' : ''} /> {t('Check again')}
         </button>
       </div>
       {editingEpisode && (
@@ -50,13 +52,13 @@ export function EpisodeCorrection({
                 tabId: tabId!,
                 episode: Number(episodeInput),
               },
-              'Episode corrected. Watch tracking restarted.',
+              t('Episode corrected. Watch tracking restarted.'),
             ).then((ok) => {
               if (ok) setEditingEpisode(false);
             });
           }}
         >
-          <label htmlFor="episode-number">MAL episode number for this page</label>
+          <label htmlFor="episode-number">{t('MAL episode number for this page')}</label>
           <div className="button-row">
             <input
               id="episode-number"
@@ -68,11 +70,11 @@ export function EpisodeCorrection({
               onChange={(e) => setEpisodeInput(e.target.value)}
             />
             <button className="button primary" disabled={!!busy}>
-              Set episode
+              {t('Set episode')}
             </button>
           </div>
           <p className="helper">
-            Applies to this episode only. Use a saved match offset for future episodes.
+            {t('Applies to this episode only. Use a saved match offset for future episodes.')}
           </p>
         </form>
       )}

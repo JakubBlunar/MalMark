@@ -1,0 +1,83 @@
+.language-picker {
+  min-width: 0;
+}
+.welcome-language {
+  padding: 20px;
+}
+.welcome-language .language-picker label {
+  margin-top: 0;
+}
+.welcome-language .language-picker .helper {
+  margin-bottom: 14px;
+}
+.language-picker label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.language-picker select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 42px;
+  border: 1px solid #36364a;
+  border-radius: 8px;
+  padding: 10px;
+  background: #12141d;
+  color: #eeeef4;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  color-scheme: dark;
+}
+.language-picker select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.language-picker select:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.language-picker.compact {
+  margin: 0 0 14px;
+}
+.language-picker.compact label {
+  font-size: 12px;
+  margin-top: 0;
+}
+.sign-in-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+.sign-in-actions .language-picker.compact {
+  margin: 0;
+}
+.works-with {
+  flex-wrap: wrap;
+}
+@media (min-width: 700px) {
+  .sign-in-actions {
+    grid-template-columns: minmax(0, 1fr) minmax(160px, 0.8fr);
+    align-items: end;
+  }
+}
+@media (max-width: 380px) {
+  .navigation > button {
+    flex-direction: column;
+    min-width: 0;
+  }
+  .navigation > button > span {
+    max-width: 100%;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+  .navigation > button > svg {
+    flex-shrink: 0;
+  }
+  .navigation .nav-count {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+  }
+}

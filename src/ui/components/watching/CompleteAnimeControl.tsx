@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useId, useState } from 'react';
 import { CheckCheck, Star } from 'lucide-react';
 import type { Anime, PendingUpdate } from '../../../shared/types';
@@ -24,6 +25,7 @@ export function CompleteAnimeControl(props: CompletionProps) {
 }
 
 function CompletionForm({ anime, pending, busy, act, autoFinishDate }: CompletionProps) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [score, setScore] = useState('');
   const scoreId = useId();
@@ -32,7 +34,9 @@ function CompletionForm({ anime, pending, busy, act, autoFinishDate }: Completio
     <div className="completion-control">
       <div className="completion-heading">
         <CheckCheck size={17} />
-        <span>Finished Airing · {pending ? 'Final episode' : 'All episodes logged'}</span>
+        <span>
+          {t('Finished Airing ·')} {pending ? t('Final episode') : t('All episodes logged')}
+        </span>
       </div>
       {editing ? (
         <form
@@ -47,24 +51,28 @@ function CompletionForm({ anime, pending, busy, act, autoFinishDate }: Completio
                 ...(pending ? { pendingId: pending.id } : {}),
                 ...(score === '' ? {} : { score: Number(score) }),
               },
-              'Marked completed on MyAnimeList.',
+              t('Marked completed on MyAnimeList.'),
             );
           }}
         >
           <p>
             {pending
-              ? `Log all ${anime.num_episodes} episodes and move this anime to Completed.`
-              : 'Move this anime to Completed.'}{' '}
-            Your score is optional.
+              ? t('Log all {{count}} episodes and move this anime to Completed.', {
+                  count: anime.num_episodes!,
+                })
+              : t('Move this anime to Completed.')}{' '}
+            {t('Your score is optional.')}
           </p>
           <p className="helper">
             {anime.my_list_status?.finish_date
-              ? `Keeps your finish date: ${anime.my_list_status.finish_date}.`
+              ? t('Keeps your finish date: {{date}}.', { date: anime.my_list_status.finish_date })
               : autoFinishDate
-                ? `Finish date will be set to today (${localDate()}).`
-                : 'Finish date stays blank. Enable automatic finish dates in Settings to fill it in.'}
+                ? t('Finish date will be set to today ({{date}}).', { date: localDate() })
+                : t(
+                    'Finish date stays blank. Enable automatic finish dates in Settings to fill it in.',
+                  )}
           </p>
-          <label htmlFor={scoreId}>Your score</label>
+          <label htmlFor={scoreId}>{t('Your score')}</label>
           <select
             id={scoreId}
             value={score}
@@ -73,19 +81,20 @@ function CompletionForm({ anime, pending, busy, act, autoFinishDate }: Completio
           >
             <option value="">
               {anime.my_list_status?.score
-                ? `Keep current score (${anime.my_list_status.score}/10)`
-                : 'Leave unrated'}
+                ? t('Keep current score ({{score}}/10)', { score: anime.my_list_status.score })
+                : t('Leave unrated')}
             </option>
             {Array.from({ length: 10 }, (_, index) => 10 - index).map((value) => (
               <option key={value} value={value}>
                 {value} / 10
               </option>
             ))}
-            {anime.my_list_status?.score ? <option value="0">Remove score</option> : null}
+            {anime.my_list_status?.score ? <option value="0">{t('Remove score')}</option> : null}
           </select>
           <div className="completion-actions">
             <button className="button primary" disabled={!!busy}>
-              {busy === key ? <Spinner /> : <CheckCheck size={16} />}Save completion
+              {busy === key ? <Spinner /> : <CheckCheck size={16} />}
+              {t('Save completion')}
             </button>
             <button
               type="button"
@@ -96,7 +105,7 @@ function CompletionForm({ anime, pending, busy, act, autoFinishDate }: Completio
                 setScore('');
               }}
             >
-              Cancel completion
+              {t('Cancel completion')}
             </button>
           </div>
         </form>
@@ -107,7 +116,7 @@ function CompletionForm({ anime, pending, busy, act, autoFinishDate }: Completio
           disabled={!!busy}
           onClick={() => setEditing(true)}
         >
-          <Star size={15} /> Complete &amp; rate
+          <Star size={15} /> {t('Complete & rate')}
         </button>
       )}
     </div>

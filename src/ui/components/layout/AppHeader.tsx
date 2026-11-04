@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import logo from '../../../assets/logo.svg';
 import { ExternalLink, PanelRightOpen, Settings2, UserRound } from 'lucide-react';
 import type { Profile } from '../../../shared/types';
@@ -26,24 +27,25 @@ export function AppHeader({
   act: Act;
   url?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <header className="header">
-        <button className="brand" onClick={() => go('watching')} aria-label="Malmark home">
+        <button className="brand" onClick={() => go('watching')} aria-label={t('Malmark home')}>
           <span className="brand-icon">
             <img src={logo} alt="" />
           </span>
           <span>
             Mal<span className="brand-light">mark</span>
-            <small>WATCH. ENJOY. REMEMBER.</small>
+            <small>{t('WATCH. ENJOY. REMEMBER.')}</small>
           </span>
         </button>
         <div className="header-actions">
           {!sidebar && (
             <button
               className="icon-button"
-              title="Open sidebar"
-              aria-label="Open sidebar"
+              title={t('Open sidebar')}
+              aria-label={t('Open sidebar')}
               disabled={!!busy || (inExtension && tabId === undefined)}
               onClick={() => void showSidebar()}
             >
@@ -53,8 +55,8 @@ export function AppHeader({
           {sidebar && connected && (
             <button
               className="icon-button expand"
-              title="Expand Malmark"
-              aria-label="Expand Malmark"
+              title={t('Expand Malmark')}
+              aria-label={t('Expand Malmark')}
               onClick={() => void act('open', () => openFullView(view, tabId))}
             >
               <ExternalLink size={16} />
@@ -63,8 +65,8 @@ export function AppHeader({
           {connected && (
             <button
               className={`icon-button ${view === 'settings' ? 'selected' : ''}`}
-              title="Settings"
-              aria-label="Settings"
+              title={t('Settings')}
+              aria-label={t('Settings')}
               aria-pressed={view === 'settings'}
               onClick={() => go('settings')}
             >
@@ -75,7 +77,7 @@ export function AppHeader({
             <button
               className={`avatar ${view === 'profile' ? 'selected' : ''}`}
               onClick={() => go('profile')}
-              aria-label="Open profile"
+              aria-label={t('Open profile')}
             >
               {profile?.picture ? <img src={profile.picture} alt="" /> : <UserRound size={18} />}
               <i className={connected ? 'online' : ''} />
@@ -86,7 +88,7 @@ export function AppHeader({
       {sidebar && (
         <div className="sidebar-context" aria-live="polite">
           <span className="status-dot online" />
-          <span>Following active tab</span>
+          <span>{t('Following active tab')}</span>
           {url && <b>{new URL(url).hostname}</b>}
         </div>
       )}
