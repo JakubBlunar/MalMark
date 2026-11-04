@@ -42,6 +42,7 @@ jobs:
           path: |
             artifacts/malmark-chromium.zip
             artifacts/malmark-firefox.zip
+            artifacts/malmark-release-notes.md
           if-no-files-found: error
 
   release:
@@ -62,6 +63,7 @@ jobs:
         run: |
           if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" artifacts/malmark-chromium.zip artifacts/malmark-firefox.zip --clobber
+            gh release edit "$RELEASE_TAG" --notes-file artifacts/malmark-release-notes.md
           else
-            gh release create "$RELEASE_TAG" artifacts/malmark-chromium.zip artifacts/malmark-firefox.zip --verify-tag --generate-notes --title "Malmark $RELEASE_TAG"
+            gh release create "$RELEASE_TAG" artifacts/malmark-chromium.zip artifacts/malmark-firefox.zip --verify-tag --notes-file artifacts/malmark-release-notes.md --title "Malmark $RELEASE_TAG"
           fi

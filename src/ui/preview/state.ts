@@ -31,6 +31,7 @@ export function previewWatchingList(accountId: number): WatchingListPage {
 export function previewState(): PublicState {
   const demo = new URLSearchParams(location.search).get('demo');
   const state: PublicState = {
+    releaseNotesUnread: new URLSearchParams(location.search).get('updated') === '1',
     settings: {
       autoProgress: false,
       autoFinishDate: false,

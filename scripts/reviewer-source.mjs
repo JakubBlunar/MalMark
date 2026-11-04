@@ -23,6 +23,7 @@ export async function reviewerSource(configuration) {
     'options.html',
     'prompt.html',
     'README.md',
+    'CHANGELOG.md',
     'PRIVACY.md',
     'LICENSE',
   ];

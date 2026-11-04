@@ -52,6 +52,19 @@ For local store submissions, copy `.env.example` to `.env`, set `VITE_MAL_CLIENT
 
 ## Releases
 
+Public release notes live in [CHANGELOG.md](CHANGELOG.md). Users can open **Settings → What’s new**, or click the version in the footer, to read the installed version’s notes and up to three earlier versions. After an update, the footer highlights the version until its notes are opened. Fresh installations start without an update highlight; reading notes is remembered locally across the popup, sidebar, and options page, independently of the MAL account.
+
+Maintain `unreleased` in `src/shared/changelog.json` as user-facing changes are made, then run `npm run changelog:write` to refresh the Markdown changelogs. Unreleased notes stay out of the app until release preparation. The project skill at [.agents/skills/malmark-release/SKILL.md](.agents/skills/malmark-release/SKILL.md) supports this workflow.
+
+When preparing a release, choose the next version and run:
+
+```sh
+npm run release:prepare -- 0.2.1  # Example: choose the actual next version
+npm run package:store           # Or npm run package for GitHub/unpacked builds
+```
+
+Release preparation moves the draft into a versioned entry, updates `package.json` and the lockfile, refreshes the public changelogs, and writes `store/release-notes-<version>.md`. Add any reviewer-specific notes separately. It does not create a Git tag, commit, publish, or submit anything. Normal builds keep the chosen version and reject missing or mismatched release notes. Packaging exports the same public notes as `artifacts/malmark-release-notes.md`; tagged GitHub releases use that copy.
+
 Store listing copy, image generation, privacy declarations and the submission checklist are in [store/README.md](store/README.md).
 
 Push a version tag matching `package.json`, such as `v0.1.0`. After checks pass, GitHub Actions publishes a Release with `malmark-chromium.zip` and `malmark-firefox.zip`, both using API setup. Pull requests run checks only; ordinary pushes to `main` do not publish or upload packages. The ZIPs are unsigned; Firefox requires signing for permanent installation. Store bundles are built locally with `npm run package:store`.

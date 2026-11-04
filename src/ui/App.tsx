@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { inExtension } from './services/extension';
 import { AppHeader } from './components/layout/AppHeader';
 import { AppNavigation } from './components/layout/AppNavigation';
@@ -27,14 +27,17 @@ export function App() {
     act,
     go,
     signIn,
+    readReleaseNotes,
     showSidebar,
     retryConnection,
     setError,
     setNotice,
   } = useAppController();
+  const [notesRequest, setNotesRequest] = useState(0);
   const shell = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (popup) shell.current?.scrollTo({ top: 0 });
+    if (activeView !== 'settings') setNotesRequest(0);
   }, [activeView]);
   return (
     <div className="app-shell" ref={shell}>
@@ -86,7 +89,16 @@ export function App() {
               {activeView === 'sites' && (
                 <SitesView state={state} tabId={tabId} busy={busy} act={act} />
               )}
-              {activeView === 'settings' && <SettingsView state={state} busy={busy} act={act} />}
+              {activeView === 'settings' && (
+                <SettingsView
+                  state={state}
+                  busy={busy}
+                  act={act}
+                  signIn={signIn}
+                  notesRequest={notesRequest}
+                  readReleaseNotes={readReleaseNotes}
+                />
+              )}
               {activeView === 'profile' && (
                 <ProfileView state={state} busy={busy} act={act} signIn={signIn} />
               )}
@@ -94,7 +106,13 @@ export function App() {
           )}
         </main>
       </div>
-      <AppFooter />
+      <AppFooter
+        unread={!!state?.releaseNotesUnread}
+        onOpenNotes={() => {
+          go('settings');
+          setNotesRequest((previous) => previous + 1);
+        }}
+      />
     </div>
   );
 }

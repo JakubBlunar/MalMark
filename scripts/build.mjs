@@ -5,7 +5,9 @@ import { resolve, sep } from 'node:path';
 import sharp from 'sharp';
 import { thirdPartyNotices } from './licenses.mjs';
 import { buildConfig } from './build-config.mjs';
+import { checkChangelog } from './changelog.mjs';
 
+await checkChangelog();
 const env = loadEnv('production', process.cwd(), 'VITE_');
 const configFlag = process.argv.indexOf('--public-config');
 const supplied =

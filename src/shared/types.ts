@@ -142,6 +142,7 @@ export interface Auth {
 }
 
 export interface PublicState {
+  releaseNotesUnread?: boolean;
   settings: Settings;
   oauth: { mode: 'unpacked' | 'store'; clientId: string };
   profile?: Profile;
@@ -161,6 +162,7 @@ export type Message =
   | { type: 'DETECTION'; detection: Detection | null; pageUrl: string; frameOrigins: string[] }
   | { type: 'PLAYBACK'; playback: Playback; pageUrl: string }
   | { type: 'GET_STATE'; tabId?: number }
+  | { type: 'MARK_RELEASE_NOTES_READ' }
   | { type: 'REFRESH_PROFILE' }
   | { type: 'GET_WATCHING_LIST'; offset?: number }
   | { type: 'CONNECT' }

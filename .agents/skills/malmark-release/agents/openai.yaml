@@ -1,0 +1,4 @@
+interface:
+  display_name: "Malmark releases"
+  short_description: "Maintain release notes and prepare Malmark builds"
+  default_prompt: "Use $malmark-release to update the changelog or prepare the next Malmark release."

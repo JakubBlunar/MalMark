@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkChangelog } from './changelog.mjs';
 
 export function validateReleaseVersion(tag, version) {
   if (!/^\d+\.\d+\.\d+$/.test(version) || tag !== `v${version}`)
@@ -10,5 +11,6 @@ export function validateReleaseVersion(tag, version) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const { version } = JSON.parse(await readFile('package.json', 'utf8'));
   validateReleaseVersion(process.env.RELEASE_TAG, version);
+  await checkChangelog();
   console.log(`Validated release ${process.env.RELEASE_TAG}.`);
 }

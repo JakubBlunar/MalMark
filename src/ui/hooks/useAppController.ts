@@ -137,13 +137,22 @@ export function useAppController() {
     if (await act('connect', { type: 'CONNECT' })) go('watching');
   }
 
+  const readReleaseNotes = useCallback(async (): Promise<void> => {
+    try {
+      if (inExtension) await request({ type: 'MARK_RELEASE_NOTES_READ' });
+      setState((previous) => previous && { ...previous, releaseNotesUnread: false });
+    } catch {
+      setError('Could not mark release notes as read. Open them again to retry.');
+    }
+  }, []);
+
   async function showSidebar(): Promise<void> {
     if (await act('sidebar', () => openSidebar(tabId))) {
       if (location.pathname.endsWith('popup.html')) window.close();
     }
   }
 
-  const activeView = state?.connected ? view : 'watching';
+  const activeView = state?.connected || view === 'settings' ? view : 'watching';
   return {
     state,
     view,
@@ -156,6 +165,7 @@ export function useAppController() {
     act,
     go,
     signIn,
+    readReleaseNotes,
     showSidebar,
     retryConnection,
     setError,

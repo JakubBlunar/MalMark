@@ -10,6 +10,9 @@
   "description": "A MyAnimeList episode tracker for Crunchyroll, with optional website setup.",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "changelog:check": "node scripts/changelog.mjs",
+    "changelog:write": "node scripts/changelog.mjs --write",
+    "release:prepare": "node scripts/prepare-release.mjs",
     "build": "tsc --noEmit && node scripts/build.mjs",
     "build:store": "tsc --noEmit && node scripts/build.mjs --store",
     "build:review": "tsc --noEmit && node scripts/build.mjs --store --public-config reviewer-config.json",

@@ -46,6 +46,7 @@ import {
 } from './guidance-prompts';
 import { automaticProgress } from './automatic-progress';
 import { getProgressNotice, showProgressNotice } from './progress-notices';
+import { initializeReleaseNotes, markReleaseNotesRead, unreadReleaseNotes } from './release-notes';
 import {
   discardWatchProgress,
   pruneWatchHistory,
@@ -412,6 +413,7 @@ async function snapshot(tabId?: number): Promise<PublicState> {
       !!session.progress.last && Date.now() - session.progress.last.sentAt < 15000;
   return {
     settings,
+    releaseNotesUnread: await unreadReleaseNotes(),
     oauth: { mode: OAUTH_SETUP_REQUIRED ? 'unpacked' : 'store', clientId },
     profile: auth?.profile,
     connected: !!auth,
@@ -508,6 +510,8 @@ async function uiMessage(message: Message): Promise<unknown> {
   switch (message.type) {
     case 'GET_STATE':
       return snapshot(message.tabId);
+    case 'MARK_RELEASE_NOTES_READ':
+      return markReleaseNotesRead();
     case 'SAVE_OAUTH_CLIENT': {
       if (!OAUTH_SETUP_REQUIRED) throw new Error('This build uses its bundled MyAnimeList app.');
       if (await getAuth()) throw new Error('Log out before changing your MyAnimeList app.');
@@ -1158,13 +1162,14 @@ browser.webNavigation.onCommitted.addListener((details) => {
   }
 });
 
-browser.runtime.onInstalled.addListener(async () => {
+browser.runtime.onInstalled.addListener(async (details) => {
   // Chromium can restrict local token storage to extension pages and background code.
   const local = browser.storage.local as typeof browser.storage.local & {
     setAccessLevel?: (options: { accessLevel: string }) => Promise<void>;
   };
   await local.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' });
   await serialized(async () => {
+    await initializeReleaseNotes(details);
     await pruneWatchHistory();
     await retireLegacyAccess().catch(() => undefined);
     const entries = await browser.storage.session.get(null);
