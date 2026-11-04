@@ -1,3 +1,20 @@
+body.popup {
+  height: 600px;
+  min-height: 0;
+  overflow: hidden;
+}
+.popup .app-shell {
+  height: min(600px, 100dvh);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+}
+.popup .navigation {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  box-shadow: 0 0 0 8px var(--dark);
+}
 .header {
   height: 86px;
   display: flex;

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { inExtension } from './services/extension';
 import { AppHeader } from './components/layout/AppHeader';
 import { AppNavigation } from './components/layout/AppNavigation';
@@ -11,6 +12,7 @@ import { SitesView } from './views/SitesView';
 import { SettingsView } from './views/SettingsView';
 import { ProfileView } from './views/ProfileView';
 import { MyListView } from './views/MyListView';
+import { popup } from './lib/surface';
 
 export function App() {
   const {
@@ -30,8 +32,12 @@ export function App() {
     setError,
     setNotice,
   } = useAppController();
+  const shell = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (popup) shell.current?.scrollTo({ top: 0 });
+  }, [activeView]);
   return (
-    <div className="app-shell">
+    <div className="app-shell" ref={shell}>
       <AppHeader
         connected={!!state?.connected}
         profile={state?.profile}
