@@ -948,16 +948,25 @@ browser.runtime.onMessage.addListener((raw: unknown, sender: browser.Runtime.Mes
           return dismissGuidance(prompt);
         }
         if (
-          message.action === 'player' &&
+          (message.action === 'player' || message.action === 'open-player') &&
           prompt.kind === 'player' &&
           message.origin &&
           prompt.origins.includes(message.origin) &&
-          session.frameOrigins.includes(message.origin) &&
-          (await browser.permissions.contains({ origins: [message.origin + '/*'] }))
+          session.frameOrigins.includes(message.origin)
         ) {
-          await injectPlayers(tabId);
-          await browser.tabs.sendMessage(tabId, { type: 'PROMPT_CHANGED' }).catch(() => undefined);
-          return;
+          if (message.action === 'open-player') {
+            await browser.tabs.create({
+              url: browser.runtime.getURL(`options.html?tab=${tabId}&view=watching`),
+            });
+            return;
+          }
+          if (await browser.permissions.contains({ origins: [message.origin + '/*'] })) {
+            await injectPlayers(tabId);
+            await browser.tabs
+              .sendMessage(tabId, { type: 'PROMPT_CHANGED' })
+              .catch(() => undefined);
+            return;
+          }
         }
         throw new Error('This action is no longer available. Open Malmark on the watch page.');
       });

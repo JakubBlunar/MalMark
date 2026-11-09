@@ -74,8 +74,9 @@ function EpisodePrompt() {
     setError('');
     try {
       if (action === 'player' && origin) {
-        // Keep the native permission request in this extension-frame click handler.
+        // Request directly where supported, or open Malmark's player access screen.
         await grantPromptPlayer(origin, nonce);
+        setBusy(false);
       } else {
         await request({ type: 'GUIDANCE_ACTION', nonce, action });
       }

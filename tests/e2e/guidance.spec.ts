@@ -118,14 +118,57 @@ test('on-page help offers shorter search results and immediate player access', a
     const player = await promptFrame(page, 'Connect the video player');
     await expect(player.getByText('player.example', { exact: true })).toBeVisible();
     await page.screenshot({ path: 'artifacts/screenshots/player-access-prompt.png' });
-    // Exercise the actual trusted button click with a denied native request.
+    // Firefox's embedded extension frames do not expose the permissions API.
     await player.evaluate(() => {
       const root = globalThis as any;
-      root.chrome.permissions.request = (permissions: any, callback?: (value: boolean) => void) => {
+      root.savedPermissions = [root.chrome, root.browser].filter(Boolean).map((api) => {
+        const descriptor = Object.getOwnPropertyDescriptor(api, 'permissions');
+        Object.defineProperty(api, 'permissions', { configurable: true, value: undefined });
+        return { api, descriptor };
+      });
+    });
+    const accessPage = context.waitForEvent('page');
+    await player.getByRole('button', { name: 'Allow', exact: true }).click();
+    const access = await accessPage;
+    await expect(access).toHaveURL(/\/options\.html\?tab=\d+&view=watching$/);
+    await expect(
+      access.getByRole('heading', { name: 'Connect the embedded player' }),
+    ).toBeVisible();
+    await expect(access.locator('.permission-row')).toContainText('player.example');
+    await expect(player.getByRole('alert')).toHaveCount(0);
+    await expect(player.getByRole('button', { name: 'Allow', exact: true })).toBeEnabled();
+    // The full extension page still requests the exact host from its trusted click.
+    await access.evaluate(() => {
+      const root = globalThis as any;
+      const deny = (permissions: any, callback?: (value: boolean) => void) => {
         root.requestedOrigins = permissions.origins;
         if (typeof callback === 'function') callback(false);
         else return Promise.resolve(false);
       };
+      for (const api of [root.chrome, root.browser].filter(Boolean)) api.permissions.request = deny;
+    });
+    await access.getByRole('button', { name: 'Allow', exact: true }).click();
+    await expect(
+      access.getByText('Player access was not granted. You can try again whenever you want.'),
+    ).toBeVisible();
+    expect(await access.evaluate(() => (globalThis as any).requestedOrigins)).toEqual([
+      'https://player.example/*',
+    ]);
+    await access.close();
+    await player.evaluate(() => {
+      const root = globalThis as any;
+      for (const { api, descriptor } of root.savedPermissions)
+        Object.defineProperty(api, 'permissions', descriptor);
+    });
+    // Exercise the actual trusted button click with a denied native request.
+    await player.evaluate(() => {
+      const root = globalThis as any;
+      const deny = (permissions: any, callback?: (value: boolean) => void) => {
+        root.requestedOrigins = permissions.origins;
+        if (typeof callback === 'function') callback(false);
+        else return Promise.resolve(false);
+      };
+      for (const api of [root.chrome, root.browser].filter(Boolean)) api.permissions.request = deny;
     });
     await player.getByRole('button', { name: 'Allow', exact: true }).click();
     await expect(player.getByRole('alert')).toContainText('Player access was not granted');

@@ -14,6 +14,10 @@ User-facing changes in Malmark. The installed app includes its current release a
 
 - The popup’s branding header scrolls away while the navigation tabs stay visible, leaving more room for content.
 
+### Fixed
+
+- On-page player access prompts open Malmark’s permission screen when the browser cannot request access on the watch page, fixing an error in Firefox.
+
 ## 0.2.0 — Your watchlist, closer
 
 ### Added

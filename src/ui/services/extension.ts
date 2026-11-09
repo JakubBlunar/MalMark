@@ -65,6 +65,12 @@ export async function grantPlayer(origin: string, tabId: number): Promise<void> 
 }
 
 export async function grantPromptPlayer(origin: string, nonce: string): Promise<void> {
+  // Firefox exposes only content-script APIs in extension frames embedded in websites.
+  // Open the full extension UI so its Allow click can request access with a new gesture.
+  if (typeof browser.permissions?.request !== 'function') {
+    await request({ type: 'GUIDANCE_ACTION', nonce, action: 'open-player', origin });
+    return;
+  }
   const granted = await browser.permissions.request({ origins: [origin + '/*'] });
   if (!granted)
     throw new Error(t('Player access was not granted. You can try again or choose Later.'));

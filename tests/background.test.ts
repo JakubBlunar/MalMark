@@ -1259,6 +1259,33 @@ describe('background consent boundary', () => {
       files: ['content.js'],
     });
   });
+  it('opens player permissions for the original watch tab without granting access or dismissing the prompt', async () => {
+    const prompt = await guidance(true);
+    const action = {
+      type: 'GUIDANCE_ACTION',
+      nonce: prompt.nonce,
+      action: 'open-player',
+      origin: 'https://player.example',
+    };
+    mock.browser.tabs.create.mockClear();
+    mock.browser.scripting.executeScript.mockClear();
+    expect(
+      (await message({ ...action, origin: 'https://unrelated.example' }, prompt.frame)).ok,
+    ).toBe(false);
+    expect((await message(action, content)).ok).toBe(false);
+    expect((await message({ ...action, nonce: 'forged' }, prompt.frame)).ok).toBe(false);
+    expect(mock.browser.tabs.create).not.toHaveBeenCalled();
+    expect((await message(action, prompt.frame)).ok).toBe(true);
+    expect(mock.browser.tabs.create).toHaveBeenCalledExactlyOnceWith({
+      url: 'moz-extension://test/options.html?tab=1&view=watching',
+    });
+    expect(mock.browser.scripting.executeScript).not.toHaveBeenCalled();
+    expect(
+      (await message({ type: 'GET_INLINE_PROMPT', nonce: prompt.nonce }, prompt.frame)).ok,
+    ).toBe(true);
+    mock.browser.tabs.get.mockResolvedValue({ id: 1, url: content.url + '&other=1' });
+    expect((await message(action, prompt.frame)).ok).toBe(false);
+  });
   it('does not prompt for already permitted, disconnected, or unobserved frame origins', async () => {
     const current = session();
     current.frameOrigins = ['https://player.example'];

@@ -194,7 +194,7 @@ export type Message =
   | {
       type: 'GUIDANCE_ACTION';
       nonce: string;
-      action: 'dismiss' | 'match' | 'player';
+      action: 'dismiss' | 'match' | 'player' | 'open-player';
       origin?: string;
     }
   | { type: 'OPEN_EXTENSION' };
